@@ -1,11 +1,10 @@
 from fastapi import FastAPI
+from dotenv import load_dotenv
+from routes.base import base_router
+
+load_dotenv()
+
 
 app = FastAPI()
 
-
-@app.get("/Welcome")
-def welcome():
-    return {
-        "message": "Welcome to the RAG ChatBot!",
-        "error": "none",
-    }
+app.include_router(base_router)
