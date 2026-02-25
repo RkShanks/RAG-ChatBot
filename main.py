@@ -1,6 +1,11 @@
-def main():
-    print("Hello from rag-chatbot!")
+from fastapi import FastAPI
+
+app = FastAPI()
 
 
-if __name__ == "__main__":
-    main()
+@app.get("/Welcome")
+def welcome():
+    return {
+        "message": "Welcome to the RAG ChatBot!",
+        "error": "none",
+    }

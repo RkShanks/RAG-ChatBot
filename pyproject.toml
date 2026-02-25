@@ -9,3 +9,12 @@ dependencies = [
     "python-multipart>=0.0.22",
     "uvicorn[standard]>=0.41.0",
 ]
+[tool.ruff]
+# Standard Python line length is 88, but you can go shorter
+line-length = 88 
+
+[tool.ruff.format]
+# Ensures double quotes are used as seen in your screenshot
+quote-style = "double"
+# Ensures trailing commas are respected for multi-line formatting
+skip-magic-trailing-comma = false

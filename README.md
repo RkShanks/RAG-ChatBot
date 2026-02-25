@@ -35,5 +35,20 @@ Copy the example environment file:
    cp .env.example .env
    ```
 Open `.env` and Set yours `Keys` and `variables`
-## How to Run Application:
 
+## API Testing
+
+You can test the FastAPI endpoints using the provided Postman collection.
+### How to Run Application:
+   ```bash
+uv run uvicorn main:app --reload
+```
+we add `--reload` for if you Restarts the server automatically whenever you save changes to your code
+### Download Postman Collection
+* **File Path:** [RAG-System_Collection.json](./assets/postman/collections/New%20Collection.postman_collection.json)
+
+### How to use:
+1. Open **Postman**.
+2. Click the **Import** button.
+3. Drag and drop the file from the `assets/postman/collections/` directory.
+4. Set your environment variable `api` to `http://127.0.0.1:8000`.

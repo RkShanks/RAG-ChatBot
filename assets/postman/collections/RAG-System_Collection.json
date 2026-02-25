@@ -1,0 +1,34 @@
+{
+  "info": {
+    "_postman_id": "decf22ed-1d7a-42f6-91ac-ce82ac0cbd1c",
+    "name": "RAG-System",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Welcome",
+      "id": "2c3ed040-dfc3-46c5-9775-e7a17aed81e0",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{api}}/Welcome",
+          "host": [
+            "{{api}}"
+          ],
+          "path": [
+            "Welcome"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "id": "e9af9fcc-f293-4aee-8f6f-2faf1494b1fd",
+      "key": "api",
+      "value": ""
+    }
+  ]
+}
