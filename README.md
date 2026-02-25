@@ -29,3 +29,11 @@ Once your virtual environment is activated, use `uv` to sync all packages define
 ```bash
 uv sync
 ```
+### 5. Environment Setup
+Copy the example environment file:
+   ```bash
+   cp .env.example .env
+   ```
+Open `.env` and Set yours `Keys` and `variables`
+## How to Run Application:
+
