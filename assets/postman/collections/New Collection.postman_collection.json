@@ -1,0 +1,101 @@
+{
+  "info": {
+    "_postman_id": "decf22ed-1d7a-42f6-91ac-ce82ac0cbd1c",
+    "name": "RAG-System",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Welcome",
+      "id": "2c3ed040-dfc3-46c5-9775-e7a17aed81e0",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{api}}/api/v1/",
+          "host": [
+            "{{api}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            ""
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "UploadFile",
+      "id": "e12d038d-0791-4d93-8ef4-633e8af34e87",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "uuid": "5129c10e-c6bf-412e-929f-b9d0f02edb17",
+              "src": [
+                "/C:/Users/avril/Desktop/RAG_TEST.txt"
+              ]
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{api}}/api/v1/data/upload/1",
+          "host": [
+            "{{api}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "data",
+            "upload",
+            "1"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "WikiSearch",
+      "id": "a819975e-1436-436c-bc5b-56714a855966",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{api}}/api/v1/wiki/wiki-search/2?query=Thomas Edison",
+          "host": [
+            "{{api}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "wiki",
+            "wiki-search",
+            "2"
+          ],
+          "query": [
+            {
+              "key": "query",
+              "value": "Thomas Edison",
+              "type": "text",
+              "uuid": "49f34ebe-bf87-4a6d-8ce2-26274a1c493d"
+            }
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "id": "6c5f588d-0305-40cd-8f6c-8d10af9c7f11",
+      "key": "api",
+      "value": ""
+    }
+  ]
+}
