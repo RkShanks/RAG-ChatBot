@@ -5,7 +5,7 @@ import re
 import aiofiles
 from fastapi import UploadFile
 
-from models.enums import ResponseSignal
+from model import ResponseSignal
 
 from .BaseController import BaseController
 from .ProjectController import ProjectController

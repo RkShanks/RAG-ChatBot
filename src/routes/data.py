@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from controllers import DataController
 from helpers.config import Settings, get_settings
 from models import ResponseSignal
+from routes.schemes.data import ProcessRequest
 
 logger = logging.getLogger("uvicorn.error")
 data_router = APIRouter(
@@ -52,3 +53,12 @@ async def upload_data(
             "file_id": file_id,
         },
     )
+
+
+@data_router.post("/process/{project_id}")
+async def process_data(
+    project_id: str,
+    request: ProcessRequest,
+    app_settings: Settings = Depends(get_settings),
+):
+    pass
