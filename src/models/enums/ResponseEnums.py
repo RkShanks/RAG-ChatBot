@@ -13,3 +13,4 @@ class ResponseSignal(Enum):
     WIKI_FILE_UPLOADED_SUCCESSFULLY = "wiki_file_uploaded_successfully"
     WIKI_FILE_UPLOAD_FAILED = "wiki_file_upload_failed"
     FILE_NOT_FOUND = "file_not_found"
+    CHUNKING_SUCCESS = "chunking_success"

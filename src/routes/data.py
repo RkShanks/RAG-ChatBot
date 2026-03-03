@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, Depends, UploadFile, status
 from fastapi.responses import JSONResponse
 
-from controllers import DataController
+from controllers import DataController, ProcessController
 from helpers.config import Settings, get_settings
 from models import ResponseSignal
 from routes.schemes.data import ProcessRequest
@@ -43,7 +43,7 @@ async def upload_data(
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={
-                "signal": ResponseSignal.FILE_UPLOAD_FAILED.value,
+                "signal": ResponseSignal.FILE_UPLOADED_FAILED.value,
             },
         )
 
@@ -61,4 +61,12 @@ async def process_data(
     request: ProcessRequest,
     app_settings: Settings = Depends(get_settings),
 ):
-    pass
+    process_controller = ProcessController(project_id=project_id)
+    chunks, signal = process_controller.get_file_chunks(file_id=request.file_id)
+
+    if chunks is None:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"signal": signal},
+        )
+    return chunks

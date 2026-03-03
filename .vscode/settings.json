@@ -1,0 +1,15 @@
+{
+    "[python]": {
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.fixAll": "explicit",
+            "source.organizeImports": "explicit"
+        }
+    },
+    "ruff.importStrategy": "fromEnvironment",
+    "ruff.interpreter": [
+        "${workspaceFolder}/src/.venv/bin/python"
+    ],
+    "ruff.enable": true
+}

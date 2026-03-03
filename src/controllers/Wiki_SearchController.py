@@ -4,6 +4,7 @@ import wikipediaapi
 from fastapi import UploadFile
 
 from .BaseController import BaseController
+from models import ProcessingEnums
 
 
 class Wiki_SearchController(BaseController):
@@ -30,7 +31,7 @@ class Wiki_SearchController(BaseController):
 
         # step 2 : create a UploadFile object
         upload_file = UploadFile(
-            filename=f"{page.title}.txt",
+            filename=f"{page.title}"+ProcessingEnums.MD.value,
             file=io.BytesIO(file_bytes),
         )
         return upload_file

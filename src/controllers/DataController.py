@@ -5,7 +5,7 @@ import re
 import aiofiles
 from fastapi import UploadFile
 
-from model import ResponseSignal
+from models import ResponseSignal, ProcessingEnums
 
 from .BaseController import BaseController
 from .ProjectController import ProjectController
@@ -47,18 +47,24 @@ class DataController(BaseController):
                 project_dir,
                 random_file_name + "_" + clean_file_name,
             )
+        
         return new_file_path, random_file_name + "_" + clean_file_name
 
     def get_clean_file_name(self, file_name: str):
         # Clean the file name to remove any unwanted characters
         clean_name = file_name.strip().replace(" ", "_")
         clean_file_name = re.sub(r"[^\w\-.\ ]", "", clean_name)
+
+        #Change txt to md for Docling compatibility
+        if clean_file_name.lower().endswith(ProcessingEnums.TXT.value):
+            clean_file_name = clean_file_name[:-4] + ProcessingEnums.MD.value
         return clean_file_name
 
     async def save_file(
         self, file: UploadFile, file_path: str, project_id: str, app_settings
     ):
         try:
+            
             async with aiofiles.open(file_path, "wb") as out_file:
                 while chunk := await file.read(app_settings.FILE_DEFAULT_CHUNK_SIZE):
                     await out_file.write(chunk)

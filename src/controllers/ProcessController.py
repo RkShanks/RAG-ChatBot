@@ -3,9 +3,11 @@ import os
 from docling.chunking import HybridChunker
 from langchain_docling import DoclingLoader
 from langchain_docling.loader import ExportType
+
 from models import ResponseSignal
 
-from .BaseController import BaseController, ProjectController
+from .BaseController import BaseController
+from .ProjectController import ProjectController
 
 
 class ProcessController(BaseController):
@@ -24,3 +26,19 @@ class ProcessController(BaseController):
             export_type=ExportType.DOC_CHUNKS,
             chunker=HybridChunker(),
         )
+        chunks = loader.load()
+        cleaned_chunks = self.clean_up_chunks(chunks=chunks)
+        return cleaned_chunks, ResponseSignal.CHUNKING_SUCCESS.value
+
+    def clean_up_chunks(self, chunks):
+        cleaned_chunks = [
+            {
+                "page_content": chunk.page_content,
+                "metadata": {
+                    "source": chunk.metadata.get("source", "unknown"),
+                },
+            }
+            for chunk in chunks
+        ]
+
+        return cleaned_chunks
