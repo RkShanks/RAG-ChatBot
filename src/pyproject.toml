@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "aiofiles>=25.1.0",
+    "asgi-correlation-id>=4.3.4",
     "docling>=2.76.0",
     "fastapi>=0.133.0",
     "langchain-community>=0.4.1",
@@ -13,12 +14,15 @@ dependencies = [
     "motor>=3.7.1",
     "pydantic-settings>=2.13.1",
     "python-dotenv>=1.2.1",
+    "python-json-logger>=4.0.0",
     "python-multipart>=0.0.22",
     "ruff>=0.15.4",
     "uvicorn[standard]>=0.41.0",
     "wikipedia-api>=0.9.0",
 ]
-
+[tool.ruff]
+# Increase the line length to 120 so your FastAPI routes fit on one line
+line-length = 120
 [tool.ruff.format]
 # Ensures double quotes are used as seen in your screenshot
 quote-style = "double"

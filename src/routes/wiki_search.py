@@ -1,13 +1,14 @@
 import logging
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import JSONResponse
 
 from controllers import DataController, Wiki_SearchController
 from helpers.config import Settings, get_settings
 from models import ResponseSignal
+from models.ProjectModel import ProjectModel
 
-logger = logging.getLogger("uvicorn.error")
+logger = logging.getLogger(__name__)
 wiki_search_router = APIRouter(
     prefix="/api/v1/wiki",
     tags=["api_v1_wiki_search"],
@@ -16,15 +17,30 @@ wiki_search_router = APIRouter(
 
 @wiki_search_router.post("/wiki-search/{project_id}")
 async def wiki_search(
-    project_id: str, query: str, app_settings: Settings = Depends(get_settings)
+    request: Request,
+    project_id: str,
+    query: str,
+    app_settings: Settings = Depends(get_settings),
 ):
+    logger.debug(f"Received wiki search request for project '{project_id}' with query '{query}'")
     # Implement the logic to perform a wiki search based on the query and project_id
+    project_model = ProjectModel(db_client=request.app.state.db_client)
+    _ = await project_model.get_project_or_create(project_id=project_id)
+
     # You can use the DataController to handle any necessary data operations
     data_controller = DataController()
     wiki_search_controller = Wiki_SearchController()
 
     # search for the query and return the results
-    page = wiki_search_controller.search_wikipedia(query=query)
+    try:
+        page = wiki_search_controller.search_wikipedia(query=query)
+    except Exception:
+        logger.exception(f"Exception occurred while searching Wikipedia for query '{query}' in project '{project_id}'")
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"search_status": ResponseSignal.WIKI_SEARCH_ERROR.value},
+        )
+
     if page is None:
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -39,13 +55,17 @@ async def wiki_search(
         file_name=upload_file.filename,
         project_id=project_id,
     )
-    is_saved = await data_controller.save_file(
-        file=upload_file,
-        file_path=file_dir_path,
-        project_id=project_id,
-        app_settings=app_settings,
-    )
-    if not is_saved:
+    try:
+        _ = await data_controller.save_file(
+            file=upload_file,
+            file_path=file_dir_path,
+            project_id=project_id,
+            app_settings=app_settings,
+        )
+    except Exception:
+        logger.exception(
+            f"Exception occurred while saving wiki search result for query '{query}' in project '{project_id}'"
+        )
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={
@@ -54,6 +74,9 @@ async def wiki_search(
             },
         )
 
+    logger.info(
+        f"Wiki search result for query '{query}' uploaded successfully as file '{file_id}' in project '{project_id}'"
+    )
     return JSONResponse(
         content={
             "search_status": ResponseSignal.WIKI_SEARCH_RESULTS_FOUND.value,

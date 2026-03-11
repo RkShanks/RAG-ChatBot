@@ -39,7 +39,7 @@
               "type": "file",
               "uuid": "5129c10e-c6bf-412e-929f-b9d0f02edb17",
               "src": [
-                "/C:/Users/avril/Desktop/RAG_TEST.txt"
+                "/C:/Users/avril/Documents/Thomas_Edison.md"
               ]
             }
           ]
@@ -82,9 +82,39 @@
             {
               "key": "query",
               "value": "Thomas Edison",
-              "type": "text",
               "uuid": "49f34ebe-bf87-4a6d-8ce2-26274a1c493d"
             }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Chunking",
+      "id": "b5efbe77-f614-4e22-9f8c-1635d7b7c187",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"file_id\" : \"vwh6b94yaf33_Thomas_Edison.md\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{api}}/api/v1/data/process/1",
+          "host": [
+            "{{api}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "data",
+            "process",
+            "1"
           ]
         }
       },

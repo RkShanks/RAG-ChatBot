@@ -1,3 +1,5 @@
+import asyncio
+import logging
 import os
 
 from docling.chunking import HybridChunker
@@ -9,6 +11,8 @@ from models import ResponseSignal
 from .BaseController import BaseController
 from .ProjectController import ProjectController
 
+logger = logging.getLogger(__name__)
+
 
 class ProcessController(BaseController):
     def __init__(self, project_id: str):
@@ -16,29 +20,26 @@ class ProcessController(BaseController):
         self.project_id = project_id
         self.project_dir = ProjectController().get_project_path(project_id=project_id)
 
-    def get_file_chunks(self, file_id: str):
+    async def get_file_chunks(self, file_id: str):
         file_path = os.path.join(self.project_dir, file_id)
+
         if not os.path.exists(file_path):
+            logger.warning(f"File not found at path: {file_path}")
             return None, ResponseSignal.FILE_NOT_FOUND.value
 
-        loader = DoclingLoader(
-            file_path=file_path,
-            export_type=ExportType.DOC_CHUNKS,
-            chunker=HybridChunker(),
-        )
-        chunks = loader.load()
-        cleaned_chunks = self.clean_up_chunks(chunks=chunks)
-        return cleaned_chunks, ResponseSignal.CHUNKING_SUCCESS.value
+        logger.debug(f"Initializing DoclingLoader for {file_id}...")
 
-    def clean_up_chunks(self, chunks):
-        cleaned_chunks = [
-            {
-                "page_content": chunk.page_content,
-                "metadata": {
-                    "source": chunk.metadata.get("source", "unknown"),
-                },
-            }
-            for chunk in chunks
-        ]
+        try:
+            loader = DoclingLoader(
+                file_path=file_path,
+                export_type=ExportType.DOC_CHUNKS,
+                chunker=HybridChunker(),
+            )
+            chunks = await asyncio.to_thread(loader.load)
 
-        return cleaned_chunks
+            logger.info(f"Successfully chunked file '{file_id}' into {len(chunks)} chunks.")
+            return chunks
+
+        except Exception:
+            logger.exception(f"Error during chunking of file '{file_id}'")
+            raise

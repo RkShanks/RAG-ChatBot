@@ -1,6 +1,9 @@
+import logging
 import os
 
 from .BaseController import BaseController
+
+logger = logging.getLogger(__name__)
 
 
 class ProjectController(BaseController):

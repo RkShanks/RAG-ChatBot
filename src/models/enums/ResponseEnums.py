@@ -8,11 +8,26 @@ class ResponseSignal(Enum):
     FILE_SIZE_EXCEEDED = "file_size_exceeded"
     FILE_UPLOADED_SUCCESSFULLY = "file_uploaded_successfully"
     FILE_UPLOADED_FAILED = "file_uploaded_failed"
+    FILE_NOT_FOUND = "file_not_found"
+
     WIKI_SEARCH_RESULTS_FOUND = "wiki_search_results_found"
     WIKI_SEARCH_NO_RESULTS = "wiki_search_no_results"
     WIKI_FILE_UPLOADED_SUCCESSFULLY = "wiki_file_uploaded_successfully"
     WIKI_FILE_UPLOAD_FAILED = "wiki_file_upload_failed"
-    FILE_NOT_FOUND = "file_not_found"
-    CHUNKING_SUCCESS = "chunking_success"
+    WIKI_SEARCH_ERROR = "wiki_search_error"
+
     DB_CONNECTION_SUCCESS = "db_connection_success"
     DB_CONNECTION_FAILED = "db_connection_failed"
+
+    CHUNKING_SUCCESS = "chunking_success"
+    CHUNKING_FAILED = "chunking_failed"
+    CHUNK_INSERTION_SUCCESSFUL = "chunk_insertion_successful"
+    CHUNK_INSERTION_FAILED = "chunk_insertion_failed"
+    CHUNK_DELETION_FAILED = "chunk_deletion_failed"
+    CHUNK_DELETION_SUCCESSFUL = "chunk_deletion_successful"
+
+    INTERNAL_SERVER_ERROR = "internal_server_error"
+    INTERNAL_SERVER_ERROR_MESSAGE = "Oops! Something went wrong on our end. Please try again later."
+
+    VALIDATION_FAILED = "validation_failed"
+    VALIDATION_FAILED_MESSAGE = "The data provided is invalid or missing required fields."

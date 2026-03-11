@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Request
 from helpers.config import Settings, get_settings
 from models.enums.ResponseEnums import ResponseSignal
 
+logger = logging.getLogger(__name__)
 base_router = APIRouter(
     prefix="/api/v1",
     tags=["api_v1"],
@@ -31,6 +32,6 @@ def check_db_connection(db_client):
         # The ping command is used to check the connection to the database
         db_client.command("ping")
         return ResponseSignal.DB_CONNECTION_SUCCESS.value
-    except Exception as e:
-        logging.getLogger("uvicorn.error").error(f"Database connection failed: {e}")
+    except Exception:
+        logger.exception("Database connection failed")
         return ResponseSignal.DB_CONNECTION_FAILED.value
