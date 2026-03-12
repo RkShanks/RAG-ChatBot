@@ -178,7 +178,9 @@ async def process_data(
             logger.exception(f"Error inserting chunks for file_id: {file_id}")
             failed_files.append(file_id)
             continue
-
+    logger.debug(
+        f"Successfully processed: Total Chunks Insertion: '{total_inserted_count}' and Failed with '{len(failed_files)}' with ID: {failed_files}"
+    )
     return JSONResponse(
         content={
             "signal": ResponseSignal.CHUNK_INSERTION_SUCCESSFUL.value,
