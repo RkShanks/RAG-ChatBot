@@ -14,6 +14,16 @@ class Project(BaseModel):
             raise ValueError("Project ID must be alphanumeric")
         return value
 
+    @classmethod
+    def get_indexes(cls):
+        return [
+            {
+                "key": [("project_id", 1)],
+                "name": "project_id_index_1",
+                "unique": True,
+            }
+        ]
+
     class Config:
         validate_by_name = True
         arbitrary_types_allowed = True

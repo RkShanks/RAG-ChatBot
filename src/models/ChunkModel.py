@@ -15,6 +15,7 @@ class ChunkModel(BaseDataModel):
     def __init__(self, db_client):
         super().__init__(db_client)
         self.collection = self.db_client[DataBaseEnum.COLLECTION_DATA_CHUNKS_NAME.value]
+        self.document_class = DataChunk
 
     async def create_data_chunk(self, chunk_data: DataChunk) -> DataChunk:
         logger.debug(

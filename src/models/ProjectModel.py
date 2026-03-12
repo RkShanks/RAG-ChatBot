@@ -15,6 +15,7 @@ class ProjectModel(BaseDataModel):
     def __init__(self, db_client):
         super().__init__(db_client)
         self.collection = self.db_client[DataBaseEnum.COLLECTION_PROJECT_NAME.value]
+        self.document_class = Project
 
     async def create_project(self, project_data: Project) -> Project:
         logger.debug(f"Creating project with ID: {project_data.project_id}")
