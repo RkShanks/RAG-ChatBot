@@ -6,8 +6,6 @@ from docling.chunking import HybridChunker
 from langchain_docling import DoclingLoader
 from langchain_docling.loader import ExportType
 
-from models import ResponseSignal
-
 from .BaseController import BaseController
 from .ProjectController import ProjectController
 
@@ -25,7 +23,7 @@ class ProcessController(BaseController):
 
         if not os.path.exists(file_path):
             logger.warning(f"File not found at path: {file_path}")
-            return None, ResponseSignal.FILE_NOT_FOUND.value
+            return None
 
         logger.debug(f"Initializing DoclingLoader for {file_id}...")
 

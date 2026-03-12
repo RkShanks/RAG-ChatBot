@@ -5,7 +5,7 @@ from bson import ObjectId
 from pymongo.errors import BulkWriteError
 
 from .BaseDataModel import BaseDataModel
-from .db_schemes import DataChunk, Project
+from .db_schemes import Asset, DataChunk, Project
 from .enums.DataBaseEnum import DataBaseEnum
 
 logger = logging.getLogger(__name__)
@@ -47,7 +47,7 @@ class ChunkModel(BaseDataModel):
             logger.exception(f"Error retrieving chunk with ID: {chunk_id}")
             raise
 
-    async def clean_chunks(self, chunks: List[Any], project: Project) -> List[DataChunk]:
+    async def clean_chunks(self, chunks: List[Any], project: Project, asset: Asset) -> List[DataChunk]:
         logger.debug(f"Cleaning {len(chunks)} chunks for project_id: {project.id}")
         chunks_record = []
 
@@ -79,6 +79,7 @@ class ChunkModel(BaseDataModel):
                     chunk_metadata=safe_metadata,
                     chunk_index=index + 1,
                     chunk_project_id=project.id,
+                    chunk_asset_id=asset.id,
                 )
             )
         logger.info(f"Cleaned {len(chunks_record)} chunks for project_id: {project.id}")

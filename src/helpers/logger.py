@@ -64,6 +64,11 @@ def get_log_config():
                 "level": "WARNING",
                 "propagate": False,
             },
+            "urllib3.connectionpool": {
+                "handlers": ["console"],
+                "level": "WARNING",
+                "propagate": False,
+            },
         },
         "root": {
             "handlers": ["console"],

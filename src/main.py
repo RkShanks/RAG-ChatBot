@@ -10,7 +10,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from helpers.config import get_settings
 from helpers.logger import setup_logging
-from models import ChunkModel, ProjectModel, ResponseSignal
+from models import AssetModel, ChunkModel, ProjectModel, ResponseSignal
 from routes import base, data, wiki_search
 
 # Set up the logger
@@ -40,14 +40,16 @@ async def lifespan(app: FastAPI):
         # 4. Stop the server from starting if the DB is down!
         raise e
 
-    # 5. INITIALIZE YOUR INDEXES HERE! This ensures indexes are always created before any requests hit the server.
+    # 5. INITIALIZE INDEXES HERE! This ensures indexes are always created before any requests hit the server.
     logger.info("Verifying database indexes...")
 
     project_model = ProjectModel(db_client=app.state.db_client)
     chunk_model = ChunkModel(db_client=app.state.db_client)
+    asset_model = AssetModel(db_client=app.state.db_client)
 
     await project_model.init_collection()
     await chunk_model.init_collection()
+    await asset_model.init_collection()
     yield
 
     # 6. Safely close the MongoDB client when the application shuts down

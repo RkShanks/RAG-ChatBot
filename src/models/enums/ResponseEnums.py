@@ -31,3 +31,6 @@ class ResponseSignal(Enum):
 
     VALIDATION_FAILED = "validation_failed"
     VALIDATION_FAILED_MESSAGE = "The data provided is invalid or missing required fields."
+
+    ASSET_RETRIEVAL_FAILED = "asset_retrieval_failed"
+    ASSET_CREATION_FAILED = "asset_creation_failed"
