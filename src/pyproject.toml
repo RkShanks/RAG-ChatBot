@@ -12,6 +12,7 @@ dependencies = [
     "langchain-community>=0.4.1",
     "langchain-docling>=2.0.0",
     "motor>=3.7.1",
+    "openai>=2.26.0",
     "pydantic-settings>=2.13.1",
     "python-dotenv>=1.2.1",
     "python-json-logger>=4.0.0",
