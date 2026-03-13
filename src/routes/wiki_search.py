@@ -5,8 +5,7 @@ from fastapi.responses import JSONResponse
 
 from controllers import DataController, Wiki_SearchController
 from helpers.config import Settings, get_settings
-from models import ResponseSignal
-from models.ProjectModel import ProjectModel
+from models import AssetModel, ProjectModel, ResponseSignal
 
 logger = logging.getLogger(__name__)
 wiki_search_router = APIRouter(
@@ -25,7 +24,7 @@ async def wiki_search(
     logger.debug(f"Received wiki search request for project '{project_id}' with query '{query}'")
     # Implement the logic to perform a wiki search based on the query and project_id
     project_model = ProjectModel(db_client=request.app.state.db_client)
-    _ = await project_model.get_project_or_create(project_id=project_id)
+    project = await project_model.get_project_or_create(project_id=project_id)
 
     # You can use the DataController to handle any necessary data operations
     data_controller = DataController()
@@ -77,10 +76,32 @@ async def wiki_search(
     logger.info(
         f"Wiki search result for query '{query}' uploaded successfully as file '{file_id}' in project '{project_id}'"
     )
-    return JSONResponse(
-        content={
-            "search_status": ResponseSignal.WIKI_SEARCH_RESULTS_FOUND.value,
-            "signal": ResponseSignal.WIKI_FILE_UPLOADED_SUCCESSFULLY.value,
-            "file_id": file_id,
-        },
-    )
+
+    asset_model = AssetModel(db_client=request.app.state.db_client)
+    try:
+        asset_record = await asset_model.create_from_file(
+            project_id=str(project.id),
+            file_id=file_id,
+            file_path=file_dir_path,
+        )
+        logger.info(
+            "Successfully processed: Creating asset record for file '{upload_file.filename}' in project '{project_id}'"
+        )
+        return JSONResponse(
+            content={
+                "search_status": ResponseSignal.WIKI_SEARCH_RESULTS_FOUND.value,
+                "signal": ResponseSignal.WIKI_FILE_UPLOADED_SUCCESSFULLY.value,
+                "file_id": str(asset_record.id),
+            }
+        )
+
+    except Exception:
+        logger.exception(
+            f"Exception occurred while creating asset record for file '{upload_file.filename}' in project '{project_id}'"
+        )
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "signal": ResponseSignal.ASSET_CREATION_FAILED.value,
+            },
+        )
