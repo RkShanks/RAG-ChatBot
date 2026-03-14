@@ -42,7 +42,7 @@ class LLMInterface(ABC):
         pass
 
     @abstractmethod
-    async def generate_embedding(self, text: str, **kwargs) -> List[float]:
+    async def generate_embedding(self, text: str, input_type: str, **kwargs) -> List[float]:
         """
         Convert a chunk of text into a vector embedding array for MongoDB $vectorSearch.
 
