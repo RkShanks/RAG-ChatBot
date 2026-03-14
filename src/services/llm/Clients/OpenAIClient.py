@@ -16,7 +16,7 @@ class OpenAIClient(LLMInterface):
         self,
         api_key: str,
         base_url: str = None,
-        default_max_input_tokens: int = 2048,
+        default_max_input_characters: int = 2048,
         default_max_output_tokens: int = 2048,
         default_temperature: float = 0.1,
     ):
@@ -24,17 +24,18 @@ class OpenAIClient(LLMInterface):
         Initialize the async OpenAI client with system-wide defaults.
         """
         if not api_key and not base_url:
+            logger.error("An OPENAI_API key or a local base_url must be provided.")
             raise ValueError("An API key or a local base_url must be provided.")
 
         # If base_url is provided, it will point to your local open-source server!
         self.client = AsyncOpenAI(api_key=api_key, base_url=base_url)
 
-        self.generation_model_id = OPENAIEnum.DEFAULT_MODEL_ID.value
-        self.embedding_model_id = OPENAIEnum.DEFAULT_EMBEDDING_MODEL_ID.value
-        self.embedding_size = OPENAIEnum.DEFAULT_EMBEDDING_SIZE.value
+        self.generation_model_id = None
+        self.embedding_model_id = None
+        self.embedding_size = None
 
         # Store your excellent RAG defaults
-        self.default_max_input_tokens = default_max_input_tokens
+        self.default_max_input_characters = default_max_input_characters
         self.default_max_output_tokens = default_max_output_tokens
         self.default_temperature = default_temperature
 
@@ -48,7 +49,7 @@ class OpenAIClient(LLMInterface):
         logger.debug(f"OpenAI embedding model set to: {model_id} (Size: {embedding_size})")
         self.embedding_model_id = model_id
         self.embedding_size = (
-            embedding_size or OPENAIEnum.DEFAULT_DIMENSIONS[model_id] or OPENAIEnum.DEFAULT_EMBEDDING_SIZE.value
+            embedding_size or OPENAIEnum.DEFAULT_DIMENSIONS[model_id].value or OPENAIEnum.DEFAULT_EMBEDDING_SIZE.value
         )
 
     @validate_llm_client
@@ -96,7 +97,7 @@ class OpenAIClient(LLMInterface):
             raise
 
     @validate_llm_client
-    async def generate_embedding(self, text: str, **kwargs) -> List[float]:
+    async def generate_embedding(self, text: str, input_type: str = None, **kwargs) -> List[float]:
         """
         Calls the OpenAI Embeddings API to convert text to a vector.
         """
@@ -139,4 +140,4 @@ class OpenAIClient(LLMInterface):
         }
 
     async def process_text(self, prompt: str) -> str:
-        return prompt[: self.default_max_input_tokens]
+        return prompt[: self.default_max_input_characters].strip()
