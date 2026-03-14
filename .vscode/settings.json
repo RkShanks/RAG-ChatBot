@@ -11,5 +11,6 @@
     "ruff.interpreter": [
         "${workspaceFolder}/src/.venv/bin/python"
     ],
-    "ruff.enable": true
+    "ruff.enable": true,
+    "python.languageServer": "Pylance"
 }
