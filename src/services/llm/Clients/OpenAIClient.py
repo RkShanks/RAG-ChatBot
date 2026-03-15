@@ -70,7 +70,7 @@ class OpenAIClient(LLMInterface):
 
         call_params = {
             "temperature": temperature or self.default_temperature,
-            "max_tokens": max_output_tokens or self.default_max_tokens,
+            "max_tokens": max_output_tokens or self.default_max_output_tokens,
             **kwargs,
         }
         try:

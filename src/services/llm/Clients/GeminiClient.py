@@ -124,7 +124,7 @@ class GeminiClient(LLMInterface):
 
     @validate_llm_client
     async def generate_embedding(
-        self, text: str, input_type: str = InputTypeEnum.SEARCH_DOCUMENT.value, **kwargs
+        self, text: str, input_type: str = InputTypeEnum.Document.value, **kwargs
     ) -> List[float]:
         """
         Calls the Gemini Embedding API.

@@ -37,6 +37,8 @@ class CohereClient(LLMInterface):
         self.default_max_tokens = default_max_output_tokens
         self.default_temperature = default_temperature
 
+        self.INPUT_TYPE_MAP = CohereEnum.INPUT_TYPE_MAP.value
+
         logger.info("Cohere client initialized.")
 
     def set_generation_model(self, model_id: str):
@@ -96,12 +98,12 @@ class CohereClient(LLMInterface):
 
     @validate_llm_client
     async def generate_embedding(
-        self, text: str, input_type: str = InputTypeEnum.SEARCH_DOCUMENT.value, **kwargs
+        self, text: str, input_type: str = InputTypeEnum.Document.value, **kwargs
     ) -> List[float]:
         """
         Calls the Cohere Embed API.
         """
-        cohere_task_type = self.task_type_map.get(input_type, "RETRIEVAL_DOCUMENT")
+        cohere_task_type = self.INPUT_TYPE_MAP.get(input_type, "RETRIEVAL_DOCUMENT")
 
         try:
             response = await self.client.embed(
