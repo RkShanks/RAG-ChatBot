@@ -12,6 +12,7 @@ from helpers.config import get_settings
 from helpers.logger import setup_logging
 from models import AssetModel, ChunkModel, ProjectModel, ResponseSignal
 from routes import base, data, wiki_search
+from services.llm import LLMFactory
 
 # Set up the logger
 setup_logging()
@@ -50,6 +51,16 @@ async def lifespan(app: FastAPI):
     await project_model.init_collection()
     await chunk_model.init_collection()
     await asset_model.init_collection()
+
+    try:
+        # Initialize GENERATION_BACKEND and EMBEDDING_BACKEND
+        logger.info("Initializing LLM backends...")
+        app.state.generation_client = LLMFactory.get_generation_client(settings)
+        app.state.embedding_client = LLMFactory.get_embedding_client(settings)
+        logger.info("✅ LLM backends initialized.")
+    except Exception:
+        logger.exception("❌ CRITICAL: Failed to initialize LLM backend")
+
     yield
 
     # 6. Safely close the MongoDB client when the application shuts down
