@@ -1,7 +1,6 @@
 import logging
 
-from Clients import CohereClient, GeminiClient, OpenAIClient
-
+from .Clients import CohereClient, GeminiClient, OpenAIClient
 from .LLMEnums import LLMEnums
 from .LLMInterface import LLMInterface
 
@@ -25,32 +24,32 @@ class LLMFactory:
         if backend == LLMEnums.OPENAI.value:
             client = OpenAIClient(
                 api_key=settings.OPENAI_API_KEY,
-                base_url=settings.OPENAI_BASE_URL,
+                base_url=settings.OPENAI_BASE_URL if settings.OPENAI_BASE_URL else None,
                 default_max_input_characters=settings.GENERATION_MAX_INPUT_CHARACTERS,
-                default_max_tokens=settings.GENERATION_DEFAULT_MAX_OUTPUT_TOKENS,
-                default_temperature=settings.DEFAULT_TEMPERATURE,
+                default_max_output_tokens=settings.GENERATION_MAX_OUTPUT_TOKENS,
+                default_temperature=settings.GENERATION_TEMPERATURE,
             )
-            client.set_generation_model(settings.GENERATION_DEFAULT_MODEL_ID)
+            client.set_generation_model(settings.GENERATION_MODEL_ID)
             return client
 
         elif backend == LLMEnums.COHERE.value:
             client = CohereClient(
                 api_key=settings.COHERE_API_KEY,
                 default_max_input_characters=settings.GENERATION_MAX_INPUT_CHARACTERS,
-                default_max_output_tokens=settings.GENERATION_DEFAULT_MAX_OUTPUT_TOKENS,
-                default_temperature=settings.DEFAULT_TEMPERATURE,
+                default_max_output_tokens=settings.GENERATION_MAX_OUTPUT_TOKENS,
+                default_temperature=settings.GENERATION_TEMPERATURE,
             )
-            client.set_generation_model(settings.GENERATION_DEFAULT_MODEL_ID)
+            client.set_generation_model(settings.GENERATION_MODEL_ID)
             return client
 
         elif backend == LLMEnums.GEMINI.value:
             client = GeminiClient(
                 api_key=settings.GEMINI_API_KEY,
                 default_max_input_characters=settings.GENERATION_MAX_INPUT_CHARACTERS,
-                default_max_output_tokens=settings.GENERATION_DEFAULT_MAX_OUTPUT_TOKENS,
-                default_temperature=settings.DEFAULT_TEMPERATURE,
+                default_max_output_tokens=settings.GENERATION_MAX_OUTPUT_TOKENS,
+                default_temperature=settings.GENERATION_TEMPERATURE,
             )
-            client.set_generation_model(settings.GENERATION_DEFAULT_MODEL_ID)
+            client.set_generation_model(settings.GENERATION_MODEL_ID)
             return client
 
         else:
@@ -68,23 +67,23 @@ class LLMFactory:
         if backend == LLMEnums.OPENAI.value:
             client = OpenAIClient(
                 api_key=settings.OPENAI_API_KEY,
-                base_url=settings.OPENAI_BASE_URL,
+                base_url=settings.OPENAI_BASE_URL if settings.OPENAI_BASE_URL else None,
             )
-            client.set_embedding_model(settings.EMBEDDING_DEFAULT_MODEL_ID)
+            client.set_embedding_model(settings.EMBEDDING_MODEL_ID)
             return client
 
         elif backend == LLMEnums.COHERE.value:
             client = CohereClient(
                 api_key=settings.COHERE_API_KEY,
             )
-            client.set_embedding_model(settings.EMBEDDING_DEFAULT_MODEL_ID)
+            client.set_embedding_model(settings.EMBEDDING_MODEL_ID)
             return client
 
         elif backend == LLMEnums.GEMINI.value:
             client = GeminiClient(
                 api_key=settings.GEMINI_API_KEY,
             )
-            client.set_embedding_model(settings.EMBEDDING_DEFAULT_MODEL_ID)
+            client.set_embedding_model(settings.EMBEDDING_MODEL_ID)
             return client
 
         else:
