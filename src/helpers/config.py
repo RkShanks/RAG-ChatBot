@@ -32,6 +32,12 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL_ID: str
     EMBEDDING_MODEL_SIZE: int = None
 
+    VECTOR_DB_BACKEND: str
+
+    QDRANT_URL: str
+    QDRANT_API_KEY: str
+    QDRANT_PATH: str
+
     class Config:
         env_file = ".env"
 
