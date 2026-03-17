@@ -1,11 +1,10 @@
 import logging
 from typing import Optional
 
-from Clients import MongoDBClient, QdrantClient
-
 from controllers.BaseController import BaseController
 
-from .VectorDBEnums import VectorDBBackendEnum
+from .Clients import MongoDBClient, QdrantClient
+from .VectorDBEnums import VectorDBEnums
 from .VectorDBInterface import VectorDBInterface
 
 logger = logging.getLogger(__name__)
@@ -35,7 +34,7 @@ class VectorDBFactory:
         # Default to the .env setting if no override is provided
         target_backend = client_backend if client_backend else settings.VECTOR_DB_BACKEND
         baseController = BaseController()
-        if target_backend == VectorDBBackendEnum.QDRANT.value:
+        if target_backend == VectorDBEnums.QDRANT.value:
             logger.info("Factory routing: Initializing Qdrant Client...")
 
             # Safely handle the API key (pass None if it's an empty string)
@@ -54,7 +53,7 @@ class VectorDBFactory:
                 path=qdrant_path,
             )
 
-        elif target_backend == VectorDBBackendEnum.MONGODB.value:
+        elif target_backend == VectorDBEnums.MONGODB.value:
             logger.info("Factory routing: Initializing MongoDB Atlas Client...")
 
             return MongoDBClient(
