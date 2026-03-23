@@ -87,7 +87,7 @@ class VectorDBInterface(ABC):
 
         Args:
             collection_name (str): The name of the collection/index.
-            document (DocumentChunk): The strictly validated Pydantic document object. # <-- Update this
+            document (DocumentChunk): The strictly validated Pydantic document object.
 
         Returns:
             bool: True if the document was successfully inserted, False otherwise.
