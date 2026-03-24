@@ -42,13 +42,13 @@ class LLMInterface(ABC):
         pass
 
     @abstractmethod
-    async def generate_embedding(self, text: str, input_type: str, **kwargs) -> List[float]:
+    async def generate_embedding(self, texts: list[str], input_type: str, **kwargs) -> list[List[float]]:
         """
-        Convert a chunk of text into a vector embedding array for MongoDB $vectorSearch.
+        Convert a list of text chunks into a list of vector embedding arrays.
 
-        :param text: The raw text chunk (e.g., from your GenZ School documents).
+        :param texts: A list of raw text chunks.
         :param kwargs: Additional provider-specific parameters.
-        :return: A list of floats representing the embedding vector.
+        :return: A list of lists of floats representing the embedding vectors.
         """
         pass
 
@@ -58,8 +58,7 @@ class LLMInterface(ABC):
         Construct a prompt for a specific role (e.g., SYSTEM, USER, etc).
 
         :param prompt: The user's question or instruction.
-        :param text: The role of prompt (e.g., SYSTEM, USER, etc).
-        :param kwargs: Additional provider-specific parameters.
-        :return: A list of floats representing the embedding vector.
+        :param role: The role of prompt (e.g., SYSTEM, USER, etc).
+        :return: A dictionary representing the constructed prompt.
         """
         pass
