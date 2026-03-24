@@ -124,8 +124,8 @@ class GeminiClient(LLMInterface):
 
     @validate_llm_client
     async def generate_embedding(
-        self, text: str, input_type: str = InputTypeEnum.Document.value, **kwargs
-    ) -> List[float]:
+        self, texts: list[str], input_type: str = InputTypeEnum.Document.value, **kwargs
+    ) -> list[List[float]]:
         """
         Calls the Gemini Embedding API.
         """
@@ -138,9 +138,8 @@ class GeminiClient(LLMInterface):
             if self.embedding_size:
                 config_params["output_dimensionality"] = self.embedding_size
 
-            # The new SDK natively supports truncation via 'output_dimensionality'
             response = await self.client.models.embed_content(
-                model=self.embedding_model_id, contents=text, config=types.EmbedContentConfig(**config_params)
+                model=self.embedding_model_id, contents=texts, config=types.EmbedContentConfig(**config_params)
             )
 
             # --- OUTPUT VALIDATION ---
@@ -148,14 +147,13 @@ class GeminiClient(LLMInterface):
                 logger.error("Gemini returned an invalid embedding format.")
                 raise ValueError("Received invalid embedding format from LLM.")
 
-            # Extract the raw list of floats
-            embedding = response.embeddings[0].values
+            embeddings = [embedding.values for embedding in response.embeddings]
 
-            if self.embedding_size and len(embedding) != self.embedding_size:
-                logger.error(f"Dimensionality mismatch! Expected {self.embedding_size}, got {len(embedding)}.")
+            if self.embedding_size and len(embeddings[0]) != self.embedding_size:
+                logger.error(f"Dimensionality mismatch! Expected {self.embedding_size}, got {len(embeddings[0])}.")
                 raise ValueError(f"Embedding dimension mismatch. Expected {self.embedding_size}.")
 
-            return embedding
+            return embeddings
 
         except Exception:
             logger.exception(f"Gemini embedding generation failed using model '{self.embedding_model_id}'")
