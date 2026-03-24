@@ -25,6 +25,7 @@ class ResponseSignal(Enum):
     CHUNK_INSERTION_FAILED = "chunk_insertion_failed"
     CHUNK_DELETION_FAILED = "chunk_deletion_failed"
     CHUNK_DELETION_SUCCESSFUL = "chunk_deletion_successful"
+    COLLECTION_CREATION_FAILED = "collection_creation_failed"
 
     INTERNAL_SERVER_ERROR = "internal_server_error"
     INTERNAL_SERVER_ERROR_MESSAGE = "Oops! Something went wrong on our end. Please try again later."
