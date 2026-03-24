@@ -10,9 +10,10 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from helpers.config import get_settings
 from helpers.logger import setup_logging
-from models import AssetModel, ChunkModel, ProjectModel, ResponseSignal
+from models import AssetModel, ProjectModel, ResponseSignal
 from routes import base, data, wiki_search
 from services.llm import LLMFactory
+from services.vectordb import VectorDBFactory
 
 # Set up the logger
 setup_logging()
@@ -45,11 +46,9 @@ async def lifespan(app: FastAPI):
     logger.info("Verifying database indexes...")
 
     project_model = ProjectModel(db_client=app.state.db_client)
-    chunk_model = ChunkModel(db_client=app.state.db_client)
     asset_model = AssetModel(db_client=app.state.db_client)
 
     await project_model.init_collection()
-    await chunk_model.init_collection()
     await asset_model.init_collection()
 
     try:
@@ -57,9 +56,24 @@ async def lifespan(app: FastAPI):
         logger.info("Initializing LLM backends...")
         app.state.generation_client = LLMFactory.get_generation_client(settings)
         app.state.embedding_client = LLMFactory.get_embedding_client(settings)
+        app.state.sparse_embedding_client = LLMFactory.get_sparse_embedding_client(settings)
         logger.info("✅ LLM backends initialized.")
     except Exception:
         logger.exception("❌ CRITICAL: Failed to initialize LLM backend")
+
+    try:
+        # Initialize VECTOR_DB_BACKEND
+        logger.info("Initializing Vector Database backend...")
+        app.state.vector_db_client = VectorDBFactory.get_vector_db_client(
+            settings,
+            client_backend=settings.VECTOR_DB_BACKEND,
+            existing_mongo_db=mongo_client[settings.MONGODB_DB_NAME],
+        )
+        await app.state.vector_db_client.connect()
+        logger.info("✅ Vector Database backend initialized.")
+    except Exception:
+        logger.exception("❌ CRITICAL: Failed to initialize Vector Database backend")
+        raise
 
     yield
 
@@ -68,6 +82,7 @@ async def lifespan(app: FastAPI):
     if hasattr(app.state, "mongo_client"):
         app.state.mongo_client.close()
         logger.info("✅ MongoDB connection closed.")
+    await app.state.vector_db_client.disconnect()
 
 
 app = FastAPI(lifespan=lifespan)
