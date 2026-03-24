@@ -1,6 +1,6 @@
 import logging
 
-from .Clients import CohereClient, GeminiClient, OpenAIClient
+from .Clients import CohereClient, GeminiClient, OpenAIClient, SparseClient
 from .LLMEnums import LLMEnums
 from .LLMInterface import LLMInterface
 
@@ -89,3 +89,11 @@ class LLMFactory:
         else:
             logger.critical(f"Unsupported EMBEDDING_BACKEND specified: {backend}")
             raise ValueError(f"Unsupported embedding backend: {backend}")
+
+    @staticmethod
+    def get_sparse_embedding_client(settings) -> LLMInterface:
+        if settings.SPARSE_CLIENT_MODEL_ID != "":
+            client = SparseClient(model_name=settings.SPARSE_CLIENT_MODEL_ID)
+            return client
+        else:
+            return SparseClient()
