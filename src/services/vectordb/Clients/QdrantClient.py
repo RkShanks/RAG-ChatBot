@@ -27,6 +27,7 @@ class QdrantClient(VectorDBInterface):
             "dot": models.Distance.DOT,
             "euclidean": models.Distance.EUCLID,
         }
+        self.sparse_needed = True
 
     async def connect(self) -> None:
         try:
@@ -145,7 +146,8 @@ class QdrantClient(VectorDBInterface):
             raise
 
     async def insert_one(self, collection_name: str, document: DocumentChunk) -> bool:
-        return await self.insert_many(collection_name, [document])
+        result = await self.insert_many(collection_name, [document])
+        return result == 0
 
     async def insert_many(self, collection_name: str, documents: List[DocumentChunk], batch_size: int = 100) -> bool:
         logger.debug(f"Inserting {len(documents)} documents into collection: {collection_name}")
@@ -170,7 +172,7 @@ class QdrantClient(VectorDBInterface):
                 continue
 
         logger.info(f"Inserted {len(documents)} chunks into {collection_name} with failed inserts: {failed_inserts}")
-        return True
+        return failed_inserts
 
     def documents_to_points(self, documents: List[DocumentChunk]) -> List[models.PointStruct]:
 
@@ -285,3 +287,6 @@ class QdrantClient(VectorDBInterface):
             query_filter = models.Filter(must=must_conditions)
 
         return query_filter
+
+    def is_sparse_needed(self) -> bool:
+        return self.sparse_needed
