@@ -98,8 +98,8 @@ class CohereClient(LLMInterface):
 
     @validate_llm_client
     async def generate_embedding(
-        self, text: str, input_type: str = InputTypeEnum.Document.value, **kwargs
-    ) -> List[float]:
+        self, texts: list[str], input_type: str = InputTypeEnum.Document.value, **kwargs
+    ) -> list[List[float]]:
         """
         Calls the Cohere Embed API.
         """
@@ -107,7 +107,7 @@ class CohereClient(LLMInterface):
 
         try:
             response = await self.client.embed(
-                texts=[text],
+                texts=texts,
                 model=self.embedding_model_id,
                 input_type=cohere_task_type,
                 embedding_types=["float"],
@@ -119,10 +119,10 @@ class CohereClient(LLMInterface):
                 logger.error("Cohere returned an invalid embedding format.")
                 raise ValueError("Received invalid embedding format from LLM.")
 
-            embedding = response.embeddings.float[0]
+            embedding = response.embeddings.float
 
-            if self.embedding_size and len(embedding) != self.embedding_size:
-                logger.error(f"Dimensionality mismatch! Expected {self.embedding_size}, got {len(embedding)}.")
+            if self.embedding_size and len(embedding[0]) != self.embedding_size:
+                logger.error(f"Dimensionality mismatch! Expected {self.embedding_size}, got {len(embedding[0])}.")
                 raise ValueError(f"Embedding dimension mismatch. Expected {self.embedding_size}.")
 
             return embedding
