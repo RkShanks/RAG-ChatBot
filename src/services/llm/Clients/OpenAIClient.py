@@ -34,7 +34,6 @@ class OpenAIClient(LLMInterface):
         self.embedding_model_id = None
         self.embedding_size = None
 
-        # Store your excellent RAG defaults
         self.default_max_input_characters = default_max_input_characters
         self.default_max_output_tokens = default_max_output_tokens
         self.default_temperature = default_temperature
@@ -97,14 +96,14 @@ class OpenAIClient(LLMInterface):
             raise
 
     @validate_llm_client
-    async def generate_embedding(self, text: str, input_type: str = None, **kwargs) -> List[float]:
+    async def generate_embedding(self, texts: list[str], input_type: str = None, **kwargs) -> list[List[float]]:
         """
         Calls the OpenAI Embeddings API to convert text to a vector.
         """
         try:
             # Generate the embedding
             response = await self.client.embeddings.create(
-                input=text,
+                input=texts,
                 model=self.embedding_model_id,
                 dimensions=self.embedding_size,
                 **kwargs,
@@ -112,20 +111,20 @@ class OpenAIClient(LLMInterface):
 
             # Verify the response
             # 1. Extract the raw float array from the response object
-            embedding = response.data[0].embedding
+            embeddings = [item.embedding for item in response.data]
 
             # 2. Verify it is actually a list
-            if not embedding or not isinstance(embedding, list):
+            if not embeddings or not isinstance(embeddings, list):
                 logger.error("OpenAI returned an invalid embedding format.")
                 raise ValueError("Received invalid embedding format from LLM.")
 
             # 3. Verify the dimensions match your database requirements exactly!
-            if self.embedding_size and len(embedding) != self.embedding_size:
-                logger.error(f"Dimensionality mismatch! Expected {self.embedding_size}, got {len(embedding)}.")
+            if self.embedding_size and len(embeddings[0]) != self.embedding_size:
+                logger.error(f"Dimensionality mismatch! Expected {self.embedding_size}, got {len(embeddings[0])}.")
                 raise ValueError(f"Embedding dimension mismatch. Expected {self.embedding_size}.")
 
             # 4. Return the guaranteed, perfectly sized vector
-            return embedding
+            return embeddings
 
         except Exception:
             logger.exception(
