@@ -1,4 +1,4 @@
-from models.enums import ProcessingEnums, ResponseSignal
+from models.enums import AssetTypeEnum, ProcessingEnums, ResponseSignal
 
 from .AssetModel import AssetModel
 from .ChunkModel import ChunkModel
@@ -10,4 +10,5 @@ __all__ = [
     "ChunkModel",
     "ProjectModel",
     "AssetModel",
+    "AssetTypeEnum",
 ]
