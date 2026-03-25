@@ -88,7 +88,7 @@ class ChunkModel:
             logger.exception(f"Error deleting chunks for collection_name: {collection_name}")
             raise
 
-    async def create_docment_chunks(
+    async def create_document_chunks(
         self,
         chunk: DataChunk,
         vectors: List[float],
