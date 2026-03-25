@@ -1,51 +1,15 @@
 import logging
-from typing import Any, List
+from typing import Any, Dict, List, Optional
 
-from bson import ObjectId
-from pymongo.errors import BulkWriteError
-
-from .BaseDataModel import BaseDataModel
-from .db_schemes import Asset, DataChunk, Project
-from .enums.DataBaseEnum import DataBaseEnum
+from .db_schemes import Asset, DataChunk, DocumentChunk, Project
 
 logger = logging.getLogger(__name__)
 
 
-class ChunkModel(BaseDataModel):
-    def __init__(self, db_client):
-        super().__init__(db_client)
-        self.collection = self.db_client[DataBaseEnum.COLLECTION_DATA_CHUNKS_NAME.value]
+class ChunkModel:
+    def __init__(self, vector_db_client):
+        self.vector_db_client = vector_db_client
         self.document_class = DataChunk
-
-    async def create_data_chunk(self, chunk_data: DataChunk) -> DataChunk:
-        logger.debug(
-            f"Creating data chunk for project_id: {chunk_data.chunk_project_id} with index: {chunk_data.chunk_index}"
-        )
-
-        # Convert the Pydantic model to a dictionary, excluding None values and using aliases
-        chunk = chunk_data.model_dump(by_alias=True, exclude_none=True)
-        try:
-            result = await self.collection.insert_one(chunk)
-            chunk_data.id = str(result.inserted_id)
-            logger.info(f"Chunk created for project {chunk_data.chunk_project_id} (MongoDB ID: {result.inserted_id})")
-            return chunk_data
-
-        except Exception:
-            logger.exception(f"Error creating data chunk for project_id: {chunk_data.chunk_project_id}")
-            raise
-
-    async def get_chunk(self, chunk_id: str) -> List[DataChunk]:
-        logger.debug(f"Retrieving chunk with ID: {chunk_id}")
-
-        try:
-            cursor = self.collection.find({"_id": ObjectId(chunk_id)})
-            raw_chunks = await cursor.to_list(length=None)
-            chunks = [DataChunk.model_validate(doc) for doc in raw_chunks]
-            logger.info(f"Retrieved {len(chunks)} chunks for chunk_id: {chunk_id}")
-            return chunks
-        except Exception:
-            logger.exception(f"Error retrieving chunk with ID: {chunk_id}")
-            raise
 
     async def clean_chunks(self, chunks: List[Any], project: Project, asset: Asset) -> List[DataChunk]:
         logger.debug(f"Cleaning {len(chunks)} chunks for project_id: {project.id}")
@@ -85,41 +49,95 @@ class ChunkModel(BaseDataModel):
         logger.info(f"Cleaned {len(chunks_record)} chunks for project_id: {project.id}")
         return chunks_record
 
-    async def insert_chunks(self, chunks: List[DataChunk], batch_size: int = 100) -> int:
+    async def insert_chunks(
+        self,
+        collection_name: str,
+        chunks: List[DocumentChunk],
+        batch_size: int = 100,
+    ) -> int:
+        """
+        Inserts a list of chunks into the vector database in batches.
+        :param collection_name: The name of the collection to insert chunks into.
+        :param chunks: A list of DocumentChunk objects to be inserted.
+        :param batch_size: The number of chunks to insert in each batch.
+        :return: The total number of chunks successfully inserted.
+
+        """
         logger.debug(f"Inserting {len(chunks)} chunks into the database with batch size: {batch_size}")
 
-        total_inserted = 0
-        for i in range(0, len(chunks), batch_size):
-            chunk_dicts = [
-                chunks[j].model_dump(by_alias=True, exclude_none=True)
-                for j in range(i, min(i + batch_size, len(chunks)))
-            ]
+        total_failed_inserts = await self.vector_db_client.insert_many(
+            collection_name=collection_name, documents=chunks, batch_size=batch_size
+        )
+        total_inserted = len(chunks) - total_failed_inserts
 
-            if chunk_dicts:
-                try:
-                    # Try to insert the batch
-                    result = await self.collection.insert_many(chunk_dicts)
-                    total_inserted += len(result.inserted_ids)
-
-                except BulkWriteError as bwe:
-                    # This catches specific MongoDB batch errors (like duplicate IDs) and contains the exact chunk that caused the crash
-                    logger.error(f"BulkWriteError on batch {i}: {bwe.details}")
-                    raise
-
-                except Exception:
-                    # Catch any network drops or unexpected crashes
-                    logger.exception(f"Unexpected database error on batch {i}")
-                    raise
-
-        logger.info(f"Successfully inserted {total_inserted} total chunks.")
+        logger.info(f"Successfully inserted {total_inserted} chunks. {total_failed_inserts} chunks failed to insert.")
         return total_inserted
 
-    async def delete_chunks_by_project_id(self, project_id: ObjectId) -> int:
-        logger.debug(f"Deleting chunks for project_id: {project_id}")
+    async def delete_chunks_by_collection_name(self, collection_name: str) -> bool:
+        """
+        Deletes all chunks associated with a given collection name from the vector database.
+        :param collection_name: The name of the collection to delete chunks from.
+        :return: True if the collection_name was exist, False otherwise.
+        """
+        logger.debug(f"Deleting chunks for collection_name: {collection_name}")
         try:
-            result = await self.collection.delete_many({"chunk_project_id": project_id})
-            logger.info(f"Deleted {result.deleted_count} chunks for project_id: {project_id}")
-            return result.deleted_count
+            result = await self.vector_db_client.delete_collection(collection_name=collection_name)
+            logger.info(f"Deleted collection: {collection_name}")
+            return result
         except Exception:
-            logger.exception(f"Error deleting chunks for project_id: {project_id}")
+            logger.exception(f"Error deleting chunks for collection_name: {collection_name}")
+            raise
+
+    async def create_document_chunks(
+        self,
+        chunk: DataChunk,
+        vectors: List[float],
+        sparse_vectors: Optional[Dict[str, List]] = None,
+    ) -> DocumentChunk:
+        """
+        Converts DataChunk objects into DocumentChunk objects for vector database insertion.
+        :param chunk: The DataChunk object to be converted.
+        :param vectors: The dense vector embedding for the chunk.
+        :param sparse_vectors: The optional sparse vector embedding for the chunk.
+        :return: A DocumentChunk object ready for the vector database.
+
+        """
+        meta_data = chunk.chunk_metadata
+        meta_data["chunk_index"] = chunk.chunk_index
+        meta_data["chunk_project_id"] = str(chunk.chunk_project_id)
+        meta_data["chunk_asset_id"] = str(chunk.chunk_asset_id)
+        return DocumentChunk(
+            text=chunk.chunk_text,
+            vector=vectors,
+            sparse_vector=sparse_vectors if sparse_vectors else None,
+            metadata=meta_data,
+        )
+
+    async def create_collection(
+        self,
+        collection_name: str,
+        vector_size: int,
+        distance_metric: str = "cosine",
+        do_reset: bool = False,
+    ) -> bool:
+        """
+        Creates a new collection in the vector database.
+        :param collection_name: The name of the collection to create.
+        :param vector_size: The size of the dense
+        :param distance_metric: The distance metric to use for the collection.
+        :param do_reset: Whether to reset the collection if it already exists.
+        :return: True if the collection was successfully created, False otherwise.
+        """
+        logger.debug(f"Creating collection: {collection_name}")
+        try:
+            result = await self.vector_db_client.create_collection(
+                collection_name=collection_name,
+                vector_size=vector_size,
+                distance_metric=distance_metric,
+                do_reset=do_reset,
+            )
+            logger.info(f"Created collection: {collection_name}")
+            return result
+        except Exception:
+            logger.exception(f"Error creating collection: {collection_name}")
             raise

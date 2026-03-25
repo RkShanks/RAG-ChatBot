@@ -45,7 +45,7 @@
           ]
         },
         "url": {
-          "raw": "{{api}}/api/v1/data/upload/1",
+          "raw": "{{api}}/api/v1/data/upload/3",
           "host": [
             "{{api}}"
           ],
@@ -54,7 +54,7 @@
             "v1",
             "data",
             "upload",
-            "1"
+            "3"
           ]
         }
       },
@@ -67,7 +67,7 @@
         "method": "POST",
         "header": [],
         "url": {
-          "raw": "{{api}}/api/v1/wiki/wiki-search/2?query=Thomas Edison",
+          "raw": "{{api}}/api/v1/wiki/wiki-search/1?query=Thomas Edison",
           "host": [
             "{{api}}"
           ],
@@ -76,7 +76,7 @@
             "v1",
             "wiki",
             "wiki-search",
-            "2"
+            "1"
           ],
           "query": [
             {
@@ -97,7 +97,7 @@
         "header": [],
         "body": {
           "mode": "raw",
-          "raw": "{\r\n    \"file_id\" : \"vwh6b94yaf33_Thomas_Edison.md\"\r\n}",
+          "raw": "{\r\n    \r\n    \"do_reset\" : 1\r\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -105,7 +105,7 @@
           }
         },
         "url": {
-          "raw": "{{api}}/api/v1/data/process/1",
+          "raw": "{{api}}/api/v1/data/process/3",
           "host": [
             "{{api}}"
           ],
@@ -114,7 +114,29 @@
             "v1",
             "data",
             "process",
-            "1"
+            "3"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Info",
+      "id": "e89c648d-2cc3-45f0-8556-dc65b3ebda42",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{api}}/api/v1/data/info/2",
+          "host": [
+            "{{api}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "data",
+            "info",
+            "2"
           ]
         }
       },

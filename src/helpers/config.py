@@ -30,9 +30,11 @@ class Settings(BaseSettings):
 
     # 4. Embedding Tuning Parameters
     EMBEDDING_MODEL_ID: str
-    EMBEDDING_MODEL_SIZE: int = None
+    EMBEDDING_MODEL_SIZE: int
+    EMBEDDING_MODEL_MAX_TOKEN: int
 
     VECTOR_DB_BACKEND: str
+    SPARSE_CLIENT_MODEL_ID: str
 
     QDRANT_URL: str
     QDRANT_API_KEY: str

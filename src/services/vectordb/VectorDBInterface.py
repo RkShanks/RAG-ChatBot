@@ -87,7 +87,7 @@ class VectorDBInterface(ABC):
 
         Args:
             collection_name (str): The name of the collection/index.
-            document (DocumentChunk): The strictly validated Pydantic document object. # <-- Update this
+            document (DocumentChunk): The strictly validated Pydantic document object.
 
         Returns:
             bool: True if the document was successfully inserted, False otherwise.
@@ -95,31 +95,18 @@ class VectorDBInterface(ABC):
         pass
 
     @abstractmethod
-    async def insert_many(self, collection_name: str, documents: List[DocumentChunk], batch_size: int = 100) -> bool:
+    async def insert_many(self, collection_name: str, documents: List[DocumentChunk], batch_size: int = 100) -> int:
         """
         Insert chunked documents and their vector embeddings into the database.
 
         Args:
             collection_name (str): The name of the collection/index.
-            documents (List[Dict[str, Any]]): A list of documents to be inserted.
+            documents (List[DocumentChunk]): A list of DocumentChunk to be inserted.
             batch_size (int): The number of documents to insert in each batch.
 
         Returns:
-            bool: True if the document was successfully inserted, False otherwise.
+            int: The total number of documents failed to be inserted.
 
-        The 'documents' list MUST follow this standard schema:
-        [
-            {
-                "id": "unique-uuid",
-                "text": "The actual string content of the document chunk.",
-                "vector": [0.12, -0.44, ...], # The embedded float array
-                "metadata": {
-                    "source": "physics_syllabus.pdf",
-                    "page": 4,
-                    "author": "Ahmed Othman"
-                }
-            }
-        ]
         """
         pass
 
@@ -144,5 +131,15 @@ class VectorDBInterface(ABC):
 
         Returns:
             A list of dictionaries containing the retrieved chunks, scores, and metadata.
+        """
+        pass
+
+    def is_sparse_needed(self) -> bool:
+        """ "
+
+        Indicates whether the vector database implementation requires sparse vectors for hybrid search.
+
+        Returns:
+            bool: True if sparse vectors are needed, False otherwise.
         """
         pass

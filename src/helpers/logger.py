@@ -41,17 +41,16 @@ def get_log_config():
                 "filters": ["correlation_id"],
             },
         },
-        # 3. SILENCE PYMONGO: Tell PyMongo to only log INFO or WARNING, never DEBUG
+        # 3. SILENCE Other Packages: Tell Packages to only log INFO or WARNING, never DEBUG
         "loggers": {
             "pymongo": {
                 "handlers": ["console"],
                 "level": "INFO",
                 "propagate": False,
             },
-            # Add Docling here to stop the Markdown parsing spam!
             "docling": {
                 "handlers": ["console"],
-                "level": "WARNING",  # Only show Docling logs if something actually breaks
+                "level": "WARNING",
                 "propagate": False,
             },
             "python_multipart": {
@@ -65,6 +64,16 @@ def get_log_config():
                 "propagate": False,
             },
             "urllib3.connectionpool": {
+                "handlers": ["console"],
+                "level": "WARNING",
+                "propagate": False,
+            },
+            "filelock": {
+                "handlers": ["console"],
+                "level": "WARNING",
+                "propagate": False,
+            },
+            "httpcore": {
                 "handlers": ["console"],
                 "level": "WARNING",
                 "propagate": False,
