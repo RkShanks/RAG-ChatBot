@@ -86,7 +86,6 @@ async def process_data(
     request: Request,
     project_id: str,
     process_request: ProcessRequest,
-    app_settings: Settings = Depends(get_settings),
 ):
     logger.debug(f"Process request started for project '{project_id}' with parameters: {process_request}")
     # Instantiate controller
@@ -103,6 +102,26 @@ async def process_data(
         do_reset=process_request.do_reset,
     )
 
+    return JSONResponse(
+        status_code=result["status"],
+        content=result["content"],
+    )
+
+
+@data_router.get("/info/{project_id}")
+async def get_collection_info(
+    request: Request,
+    project_id: str,
+):
+    logger.debug(f"Get process info request started for project '{project_id}'")
+    controller = ProcessController(
+        project_id=project_id,
+        db_client=request.app.state.db_client,
+        vector_client=request.app.state.vector_db_client,
+        embedding_client=request.app.state.embedding_client,
+        sparse_embedding_client=request.app.state.sparse_embedding_client,
+    )
+    result = await controller.get_vector_db_collection_info(project_id=project_id)
     return JSONResponse(
         status_code=result["status"],
         content=result["content"],
