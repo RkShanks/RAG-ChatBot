@@ -176,7 +176,7 @@ class ProcessController(BaseController):
 
                 # 3. Package the vectors back into the chunk objects
                 for j, chunk in enumerate(batch):
-                    document_chunk = await self.chunk_model.create_docment_chunks(
+                    document_chunk = await self.chunk_model.create_document_chunks(
                         chunk=chunk,
                         vectors=dense_embeddings[j],
                         sparse_vectors=sparse_embeddings[j] if needs_sparse else None,
@@ -313,3 +313,23 @@ class ProcessController(BaseController):
                 "total_failed_inserts": total_failed_inserted_count,
             },
         }
+
+    async def get_vector_db_collection_info(self, project_id: str):
+        collection_name = self.get_collection_name(project_id=project_id)
+        logger.debug(f"Attempting to retrieve collection info for '{collection_name}'")
+        try:
+            info = await self.vector_client.get_collection_info(collection_name=collection_name)
+            logger.info(f"Successfully retrieved collection info for '{collection_name}'")
+            return {
+                "status": status.HTTP_200_OK,
+                "content": {
+                    "signal": ResponseSignal.COLLECTION_INFO_SUCCESSFUL.value,
+                    "info": info,
+                },
+            }
+        except Exception:
+            logger.exception(f"Failed to get collection info for '{collection_name}'")
+            return {
+                "status": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "content": {"signal": ResponseSignal.COLLECTION_INFO_FAILED.value},
+            }
