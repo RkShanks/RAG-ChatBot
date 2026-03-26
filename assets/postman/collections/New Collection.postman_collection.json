@@ -141,6 +141,18 @@
         }
       },
       "response": []
+    },
+    {
+      "name": "nlp_search",
+      "id": "06952de3-0f8b-4a8e-9a2f-cee1ccf7f73d",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": ""
+        }
+      },
+      "response": []
     }
   ],
   "variable": [
