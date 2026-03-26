@@ -2,6 +2,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from controllers.BaseController import BaseController
+from models.db_schemes import RetrievedDocument
 from services.llm import InputTypeEnum, LLMInterface
 from services.vectordb import VectorDBInterface
 
@@ -58,14 +59,27 @@ class NLPController(BaseController):
             filter_criteria=filter_criteria,
             sparse_query_vector=sparse_query_vector,
         )
+        format_results = self.format_search_results(initial_results)
 
         # The Cross-Encoder Reranking
-        if self.reranker_client and initial_results:
+        if self.reranker_client and format_results:
             logger.debug(f"Reranking top {retrieval_limit} chunks to find the absolute best {final_limit}...")
             reranked_results = await self.reranker_client.rerank(
-                query=query, documents=initial_results, top_n=final_limit
+                query=query, documents=format_results, top_k=final_limit
             )
             return reranked_results
 
         # Fallback if no reranker is configured
-        return initial_results[:final_limit]
+        return format_results[:final_limit]
+
+    def format_search_results(self, search_results: List[Dict[str, Any]]) -> List[RetrievedDocument]:
+        formatted_results = []
+        for result in search_results:
+            formatted_results.append(
+                RetrievedDocument(
+                    text=result.get("text"),
+                    relevance_score=float(result.get("score")),
+                    metadata=result.get("metadata"),
+                )
+            )
+        return formatted_results
