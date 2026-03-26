@@ -34,3 +34,6 @@ class BaseController:
         if not os.path.exists(database_path):
             os.makedirs(database_path)
         return database_path
+
+    def get_collection_name(self, project_id: str) -> str:
+        return f"collection_{project_id}".strip()
