@@ -275,7 +275,9 @@ class QdrantClient(VectorDBInterface):
                     "metadata": {k: v for k, v in point.payload.items() if k != "text"},
                 }
             )
-
+        logger.info(
+            f"Found {len(formatted_results)} results in collection: {collection_name} with filter: {filter_criteria}"
+        )
         return formatted_results
 
     def create_query_filter(self, filter_criteria: Optional[Dict[str, Any]]) -> Optional[models.Filter]:
