@@ -29,12 +29,13 @@ async def search_data(
         generation_client=request.app.state.generation_client,
         embedding_client=request.app.state.embedding_client,
         sparse_embedding_client=request.app.state.sparse_embedding_client,
+        reranker_client=request.app.state.ranker_client,
     )
 
     result = await nlp_controller.search_and_rerank(
         project_id=project_id,
         query=search_request.query,
-        retrieval_limit=search_request.limit,
+        retrieval_limit=search_request.limit * 2,
         final_limit=search_request.limit,
         filter_criteria=search_request.filter_criteria,
     )
@@ -43,6 +44,6 @@ async def search_data(
         status_code=status.HTTP_200_OK,
         content={
             "signal": ResponseSignal.NLP_SEARCH_SUCCESSFUL.value,
-            "results": result,
+            "results": [doc.model_dump() for doc in result],
         },
     )
