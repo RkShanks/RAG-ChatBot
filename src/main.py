@@ -11,7 +11,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from helpers.config import get_settings
 from helpers.logger import setup_logging
 from models import AssetModel, ProjectModel, ResponseSignal
-from routes import base, data, wiki_search
+from routes import base, data, nlp, wiki_search
 from services.llm import LLMFactory
 from services.vectordb import VectorDBFactory
 
@@ -141,3 +141,4 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 app.include_router(base.base_router)
 app.include_router(data.data_router)
 app.include_router(wiki_search.wiki_search_router)
+app.include_router(nlp.nlp_router)
