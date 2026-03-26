@@ -38,3 +38,6 @@ class ResponseSignal(Enum):
 
     ASSET_RETRIEVAL_FAILED = "asset_retrieval_failed"
     ASSET_CREATION_FAILED = "asset_creation_failed"
+
+    NLP_SEARCH_FAILED = "nlp_search_failed"
+    NLP_SEARCH_SUCCESSFUL = "nlp_search_successful"
