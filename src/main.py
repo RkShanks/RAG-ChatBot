@@ -13,6 +13,7 @@ from helpers.logger import setup_logging
 from models import AssetModel, ProjectModel, ResponseSignal
 from routes import base, data, nlp, wiki_search
 from services.llm import LLMFactory
+from services.ranker import RankerFactory
 from services.vectordb import VectorDBFactory
 
 # Set up the logger
@@ -74,7 +75,7 @@ async def lifespan(app: FastAPI):
     except Exception:
         logger.exception("❌ CRITICAL: Failed to initialize Vector Database backend")
         raise
-
+    app.state.ranker_client = RankerFactory.get_ranker_client(settings)
     yield
 
     # 6. Safely close the MongoDB client when the application shuts down
