@@ -57,7 +57,7 @@ class OpenAIClient(LLMInterface):
         prompt: str,
         chat_history: List[Dict[str, str]] = None,
         temperature: float = None,
-        max_output_tokens: int = None,
+        max_output_tokens: int = 4000,
         **kwargs,
     ) -> str:
         """
@@ -69,26 +69,39 @@ class OpenAIClient(LLMInterface):
 
         call_params = {
             "temperature": temperature or self.default_temperature,
-            "max_tokens": max_output_tokens or self.default_max_output_tokens,
+            "max_tokens": max_output_tokens or self.default_max_output_tokens or 4000,
             **kwargs,
         }
+
         try:
-            # 2. Call the async client, passing in any extra kwargs (like temperature)
+            # 2. Call the async client
             response = await self.client.chat.completions.create(
                 model=self.generation_model_id,
                 messages=messages,
                 **call_params,
             )
 
-            # 3. Extract the content
-            content = response.choices[0].message.content
+            # 3. Extract the message object
+            message = response.choices[0].message
+            content = message.content or ""  # Default to empty string if None
 
-            # 5. Verify it is a valid string and not empty
+            # 4. Safely check for the new Reasoning field used by Qwen 3.5 / DeepSeek
+            reasoning = getattr(message, "reasoning_content", None)
+
+            # 5. Handle the Reasoning logic
+            if not content.strip() and reasoning:
+                # Scenario A: It thought too long and ran out of tokens before answering
+                content = f"🤔 [Internal Thought Process]:\n{reasoning}\n\n(Warning: The model ran out of tokens before giving a final answer.)"
+            elif reasoning:
+                # Scenario B: It thought, and then it answered. Let's show both!
+                content = f"🤔 [Thought Process]:\n{reasoning}\n\n🤖 [Answer]:\n{content}"
+
+            # 6. Verify it is a valid string and not empty
             if not content or not isinstance(content, str) or not content.strip():
                 logger.error(f"OpenAI returned an empty or invalid response for model '{self.generation_model_id}'")
                 raise ValueError("Received empty text response from LLM.")
 
-            #  Return the clean guaranteed string
+            # Return the clean guaranteed string
             return content.strip()
 
         except Exception:
