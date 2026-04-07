@@ -47,3 +47,45 @@ async def search_data(
             "results": [doc.model_dump() for doc in result],
         },
     )
+
+
+@nlp_router.post("/chat/{project_id}")
+async def chat_with_project(
+    request: Request,
+    project_id: str,
+    search_request: SearchRequest,
+    app_settings: Settings = Depends(get_settings),
+):
+    logger.debug(f"Chat request started for project '{project_id}' with query: {search_request.query}")
+
+    nlp_controller = NLPController(
+        vector_client=request.app.state.vector_db_client,
+        generation_client=request.app.state.generation_client,
+        embedding_client=request.app.state.embedding_client,
+        sparse_embedding_client=request.app.state.sparse_embedding_client,
+        reranker_client=request.app.state.ranker_client,
+    )
+
+    try:
+        answer, history = await nlp_controller.ask_question_stream(
+            project_id=project_id,
+            query=search_request.query,
+            chat_history=search_request.chat_history,
+            limit=search_request.limit,
+            target_locale=search_request.target_locale,
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "signal": ResponseSignal.NLP_CHAT_SUCCESSFUL.value,
+                "answer": answer,
+                "chat_history": history,
+            },
+        )
+    except Exception:
+        logger.exception(f"Chat failed for project {project_id}")
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"signal": ResponseSignal.NLP_CHAT_FAILED.value},
+        )
