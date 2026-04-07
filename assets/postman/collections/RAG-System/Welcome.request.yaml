@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{api}}/api/v1/"
+method: GET
+order: 1000

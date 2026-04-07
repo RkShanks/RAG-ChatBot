@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{api}}/api/v1/data/info/1"
+method: GET
+order: 5000

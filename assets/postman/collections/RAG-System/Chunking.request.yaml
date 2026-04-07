@@ -1,0 +1,13 @@
+$kind: http-request
+url: "{{api}}/api/v1/data/process/3"
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \    \r
+
+    \    \"do_reset\" : 1\r
+
+    }"
+order: 4000
