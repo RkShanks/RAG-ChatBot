@@ -41,3 +41,5 @@ class ResponseSignal(Enum):
 
     NLP_SEARCH_FAILED = "nlp_search_failed"
     NLP_SEARCH_SUCCESSFUL = "nlp_search_successful"
+    NLP_CHAT_FAILED = "nlp_chat_failed"
+    NLP_CHAT_SUCCESSFUL = "nlp_chat_successful"
