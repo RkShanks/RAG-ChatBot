@@ -17,7 +17,7 @@ CONSTRAINTS:
 1. NO HALLUCINATIONS: If the answer cannot be deduced from the context, you MUST state: "I cannot answer this based on the provided documents."
 2. NO EXTERNAL KNOWLEDGE: Do not supplement your answer with outside information.
 3. LANGUAGE: You MUST generate your entire response in the following language/locale: {target_locale}
-
+4. CONCISENESS: Answer directly based on the context. If the text implies an answer but does not explicitly state it, you may infer the answer but must briefly mention the inference.
 --- START CONTEXT ---
 {context_string}
 --- END CONTEXT ---
@@ -138,13 +138,44 @@ CONSTRAINTS:
 
         return valid_history
 
+    async def ask_question(
+        self,
+        project_id: str,
+        query: str,
+        chat_history: Optional[List[Dict[str, str]]] = None,
+        limit: int = 5,
+        target_locale: str = "Based in Query language",
+        max_output_tokens: Optional[int] = None,
+    ):
+        chat_history = chat_history or []
+
+        # Step A: Retrieve & Rerank
+        search_results = await self.search_and_rerank(project_id, query, retrieval_limit=20, final_limit=limit)
+        context_string = self.format_context(search_results)
+
+        # Step B: Build system prompt
+        system_prompt = self.SYSTEM_PROMPT_TEMPLATE.format(context_string=context_string, target_locale=target_locale)
+
+        # Step C: Token Trimming
+        trimmed_history = self._manage_token_window(system_prompt, query, chat_history)
+
+        # Step D: Inject the System Prompt as the FIRST message in the history list
+        final_payload_history = [{"role": "system", "content": system_prompt}] + trimmed_history
+
+        # Step E: Generate the final response
+        logger.info(f"Starting LLM response for project {project_id}...")
+        response = await self.generation_client.generate_text(
+            prompt=query, chat_history=final_payload_history, max_output_tokens=max_output_tokens
+        )
+        return response, final_payload_history
+
     async def ask_question_stream(
         self,
         project_id: str,
         query: str,
         chat_history: Optional[List[Dict[str, str]]] = None,
         limit: int = 5,
-        target_locale: str = "en-US",
+        target_locale: str = "Based in Query language",
         max_output_tokens: int = None,
     ):
 
@@ -165,7 +196,7 @@ CONSTRAINTS:
 
         # Step E: Generate the final response
         logger.info(f"Starting streaming LLM response for project {project_id}...")
-        result = await self.generation_client.generate_text(
+        stream = self.generation_client.generate_text_stream(
             prompt=query, chat_history=final_payload_history, max_output_tokens=max_output_tokens
         )
-        return result, final_payload_history
+        return stream, final_payload_history
