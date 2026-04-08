@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic_settings import BaseSettings
 
 
@@ -15,12 +17,14 @@ class Settings(BaseSettings):
 
     GENERATION_BACKEND: str
     EMBEDDING_BACKEND: str
+    RERANKER_BACKEND: Optional[str]
 
     # 2. Provider Secrets
     OPENAI_API_KEY: str
     OPENAI_BASE_URL: str = None
     COHERE_API_KEY: str
     GEMINI_API_KEY: str
+    RANKER_API_KEY: str
 
     # 3. Generation Tuning Parameters  # or "command-r"
     GENERATION_MODEL_ID: str
@@ -32,6 +36,9 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL_ID: str
     EMBEDDING_MODEL_SIZE: int
     EMBEDDING_MODEL_MAX_TOKEN: int
+
+    # 5. Ranker Tuning Parameters
+    RERANKER_MODEL_ID: Optional[str]
 
     VECTOR_DB_BACKEND: str
     SPARSE_CLIENT_MODEL_ID: str

@@ -1,0 +1,6 @@
+$kind: http-request
+url: "{{api}}/api/v1/wiki/wiki-search/1?query=Thomas Edison"
+method: POST
+queryParams:
+  query: Thomas Edison
+order: 3000

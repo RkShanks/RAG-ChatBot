@@ -11,8 +11,9 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from helpers.config import get_settings
 from helpers.logger import setup_logging
 from models import AssetModel, ProjectModel, ResponseSignal
-from routes import base, data, wiki_search
+from routes import base, data, nlp, wiki_search
 from services.llm import LLMFactory
+from services.ranker import RankerFactory
 from services.vectordb import VectorDBFactory
 
 # Set up the logger
@@ -74,7 +75,7 @@ async def lifespan(app: FastAPI):
     except Exception:
         logger.exception("❌ CRITICAL: Failed to initialize Vector Database backend")
         raise
-
+    app.state.ranker_client = RankerFactory.get_ranker_client(settings)
     yield
 
     # 6. Safely close the MongoDB client when the application shuts down
@@ -141,3 +142,4 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 app.include_router(base.base_router)
 app.include_router(data.data_router)
 app.include_router(wiki_search.wiki_search_router)
+app.include_router(nlp.nlp_router)

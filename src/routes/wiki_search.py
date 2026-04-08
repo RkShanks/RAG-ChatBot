@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from controllers import DataController, Wiki_SearchController
 from helpers.config import Settings, get_settings
 from models import AssetModel, ProjectModel, ResponseSignal
+from routes.schemes.wiki import SearchWikiRequest
 
 logger = logging.getLogger(__name__)
 wiki_search_router = APIRouter(
@@ -18,10 +19,10 @@ wiki_search_router = APIRouter(
 async def wiki_search(
     request: Request,
     project_id: str,
-    query: str,
+    wiki_search_request: SearchWikiRequest,
     app_settings: Settings = Depends(get_settings),
 ):
-    logger.debug(f"Received wiki search request for project '{project_id}' with query '{query}'")
+    logger.debug(f"Received wiki search request for project '{project_id}' with query '{wiki_search_request.query}'")
     # Implement the logic to perform a wiki search based on the query and project_id
     project_model = ProjectModel(db_client=request.app.state.db_client)
     project = await project_model.get_project_or_create(project_id=project_id)
@@ -32,9 +33,13 @@ async def wiki_search(
 
     # search for the query and return the results
     try:
-        page = wiki_search_controller.search_wikipedia(query=query)
+        page = wiki_search_controller.search_wikipedia(
+            query=wiki_search_request.query, language=wiki_search_request.lang
+        )
     except Exception:
-        logger.exception(f"Exception occurred while searching Wikipedia for query '{query}' in project '{project_id}'")
+        logger.exception(
+            f"Exception occurred while searching Wikipedia for query '{wiki_search_request.query}' in project '{project_id}'"
+        )
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={"search_status": ResponseSignal.WIKI_SEARCH_ERROR.value},
@@ -63,7 +68,7 @@ async def wiki_search(
         )
     except Exception:
         logger.exception(
-            f"Exception occurred while saving wiki search result for query '{query}' in project '{project_id}'"
+            f"Exception occurred while saving wiki search result for query '{wiki_search_request.query}' in project '{project_id}'"
         )
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -74,7 +79,7 @@ async def wiki_search(
         )
 
     logger.info(
-        f"Wiki search result for query '{query}' uploaded successfully as file '{file_id}' in project '{project_id}'"
+        f"Wiki search result for query '{wiki_search_request.query}' uploaded successfully as file '{file_id}' in project '{project_id}'"
     )
 
     asset_model = AssetModel(db_client=request.app.state.db_client)

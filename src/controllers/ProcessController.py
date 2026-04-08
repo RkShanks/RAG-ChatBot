@@ -91,10 +91,6 @@ class ProcessController(BaseController):
 
         return None
 
-    def get_collection_name(self, project_id: str) -> str:
-        collection_name = f"collection_{project_id}".strip()
-        return collection_name
-
     async def get_file_chunks(self, file_id: str):
         file_path = os.path.join(self.project_dir, file_id)
 

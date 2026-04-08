@@ -123,6 +123,55 @@ class GeminiClient(LLMInterface):
             raise
 
     @validate_llm_client
+    async def generate_text_stream(
+        self, prompt: str, chat_history: List[Dict[str, str]] = None, max_output_tokens: int = None, **kwargs
+    ):
+        """
+        Calls the Gemini Text Generation API with streaming enabled.
+        """
+        gemini_history = []
+        system_instruction = None
+
+        if chat_history:
+            for msg in chat_history:
+                role = msg.get("role", GeminiEnum.USER.value)
+
+                # Gemini handles system prompts via config, not in the standard message array
+                if role.lower() == "system":
+                    system_instruction = await self.process_text(msg.get("content", ""))
+                    continue
+
+                formatted_msg = await self.construct_prompt(msg.get("content", ""), role)
+                gemini_history.append(formatted_msg)
+
+        # Append the current prompt
+        gemini_history.append(await self.construct_prompt(prompt, GeminiEnum.USER.value))
+
+        # Pack everything cleanly into Gemini's GenerateContentConfig
+        call_params = {
+            "temperature": self.default_temperature,
+            "max_output_tokens": max_output_tokens or self.default_max_tokens,
+            **kwargs,
+        }
+        if system_instruction:
+            call_params["system_instruction"] = system_instruction
+
+        try:
+            response = await self.client.models.generate_content_stream(
+                model=self.generation_model_id,
+                contents=gemini_history,
+                config=types.GenerateContentConfig(**call_params),
+            )
+
+            async for chunk in response:
+                if chunk.text:
+                    yield {"type": "answer", "text": chunk.text}
+
+        except Exception:
+            logger.exception(f"Gemini text stream generation failed using model '{self.generation_model_id}'")
+            raise
+
+    @validate_llm_client
     async def generate_embedding(
         self, texts: list[str], input_type: str = InputTypeEnum.Document.value, **kwargs
     ) -> list[List[float]]:

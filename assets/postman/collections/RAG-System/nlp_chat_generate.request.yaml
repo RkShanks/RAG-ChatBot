@@ -1,0 +1,12 @@
+$kind: http-request
+name: nlp_chat_generate
+url: "{{api}}/api/v1/nlp/ask/generate/1"
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \    \"query\": \"الي اي جنسيه ينتمي اليها اديسون\"\r
+
+    }"
+order: 7700

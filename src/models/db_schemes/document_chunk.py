@@ -14,3 +14,9 @@ class DocumentChunk(BaseModel):
 
     # Optional keyword math for Hybrid Search (e.g., Fastembed)
     sparse_vector: Optional[Dict[str, List[float]]] = None
+
+
+class RetrievedDocument(BaseModel):
+    text: str
+    relevance_score: float
+    metadata: Dict[str, Any] = Field(default_factory=dict)

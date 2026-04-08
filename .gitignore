@@ -88,3 +88,4 @@ target/
 
 # Virtual environment
 .venv/
+src/test.py

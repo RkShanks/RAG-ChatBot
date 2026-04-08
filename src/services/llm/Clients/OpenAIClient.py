@@ -57,7 +57,7 @@ class OpenAIClient(LLMInterface):
         prompt: str,
         chat_history: List[Dict[str, str]] = None,
         temperature: float = None,
-        max_output_tokens: int = None,
+        max_output_tokens: int = 4000,
         **kwargs,
     ) -> str:
         """
@@ -69,31 +69,91 @@ class OpenAIClient(LLMInterface):
 
         call_params = {
             "temperature": temperature or self.default_temperature,
-            "max_tokens": max_output_tokens or self.default_max_output_tokens,
+            "max_tokens": max_output_tokens or self.default_max_output_tokens or 4000,
             **kwargs,
         }
+
         try:
-            # 2. Call the async client, passing in any extra kwargs (like temperature)
+            # 2. Call the async client
             response = await self.client.chat.completions.create(
                 model=self.generation_model_id,
                 messages=messages,
                 **call_params,
             )
 
-            # 3. Extract the content
-            content = response.choices[0].message.content
+            # 3. Extract the message object
+            message = response.choices[0].message
+            content = message.content or ""  # Default to empty string if None
 
-            # 5. Verify it is a valid string and not empty
+            # 4. Safely check for the new Reasoning field used by Qwen 3.5 / DeepSeek
+            reasoning = getattr(message, "reasoning_content", None)
+
+            # 5. Handle the Reasoning logic
+            if not content.strip() and reasoning:
+                # Scenario A: It thought too long and ran out of tokens before answering
+                content = f"🤔 [Internal Thought Process]:\n{reasoning}\n\n(Warning: The model ran out of tokens before giving a final answer.)"
+            elif reasoning:
+                # Scenario B: It thought, and then it answered. Let's show both!
+                content = f"🤔 [Thought Process]:\n{reasoning}\n\n🤖 [Answer]:\n{content}"
+
+            # 6. Verify it is a valid string and not empty
             if not content or not isinstance(content, str) or not content.strip():
                 logger.error(f"OpenAI returned an empty or invalid response for model '{self.generation_model_id}'")
                 raise ValueError("Received empty text response from LLM.")
 
-            #  Return the clean guaranteed string
+            # Return the clean guaranteed string
             return content.strip()
 
         except Exception:
             logger.exception(f"OpenAI text generation failed using model '{self.generation_model_id}'")
             raise
+
+    @validate_llm_client
+    async def generate_text_stream(
+        self,
+        prompt: str,
+        chat_history: List[Dict[str, str]] = None,
+        temperature: float = None,
+        max_output_tokens: int = 4096,  # 🚀 BUMPED TO 4096: Give it room to think!
+        **kwargs,
+    ):
+        messages = chat_history.copy() if chat_history else []
+        messages.append(await self.construct_prompt(prompt, OPENAIEnum.USER.value))
+
+        call_params = {
+            "temperature": temperature or self.default_temperature,
+            "max_tokens": max_output_tokens or 4096,
+            **kwargs,
+        }
+
+        try:
+            response = await self.client.chat.completions.create(
+                model=self.generation_model_id,
+                messages=messages,
+                stream=True,
+                **call_params,
+            )
+
+            async for chunk in response:
+                choices = getattr(chunk, "choices", [])
+                if not choices:
+                    continue
+
+                delta = getattr(choices[0], "delta", None)
+                if not delta:
+                    continue
+
+                content = getattr(delta, "content", "") or ""
+                reasoning = getattr(delta, "reasoning", "") or getattr(delta, "reasoning_content", "") or ""
+
+                if reasoning:
+                    yield {"type": "thinking", "text": reasoning}
+                elif content:
+                    yield {"type": "answer", "text": content}
+
+        except Exception as e:
+            logger.exception("Stream failed internally.")
+            yield f"\n\n[INTERNAL STREAM ERROR]: {str(e)}"
 
     @validate_llm_client
     async def generate_embedding(self, texts: list[str], input_type: str = None, **kwargs) -> list[List[float]]:

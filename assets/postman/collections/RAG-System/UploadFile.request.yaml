@@ -1,0 +1,11 @@
+$kind: http-request
+url: "{{api}}/api/v1/data/upload/3"
+method: POST
+body:
+  type: formdata
+  content:
+    - type: file
+      key: file
+      src:
+        - /C:/Users/avril/Documents/Thomas_Edison.md
+order: 2000
