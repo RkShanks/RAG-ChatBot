@@ -42,6 +42,20 @@ class LLMInterface(ABC):
         pass
 
     @abstractmethod
+    async def generate_text_stream(
+        self, prompt: str, chat_history: List[Dict[str, str]] = None, max_output_tokens: int = None, **kwargs
+    ):
+        """
+        Generate a text response stream from the LLM based on a prompt and optional chat history.
+
+        :param prompt: The user's question or instruction.
+        :param chat_history: A list of previous messages for context [{"role": "user", "content": "..."}, ...].
+        :param kwargs: Additional parameters like temperature, max_tokens, etc.
+        :return: An asynchronous generator yielding the generated text chunks.
+        """
+        pass
+
+    @abstractmethod
     async def generate_embedding(self, texts: list[str], input_type: str, **kwargs) -> list[List[float]]:
         """
         Convert a list of text chunks into a list of vector embedding arrays.
