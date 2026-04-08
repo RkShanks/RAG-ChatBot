@@ -109,6 +109,53 @@ class OpenAIClient(LLMInterface):
             raise
 
     @validate_llm_client
+    async def generate_text_stream(
+        self,
+        prompt: str,
+        chat_history: List[Dict[str, str]] = None,
+        temperature: float = None,
+        max_output_tokens: int = 4096,  # 🚀 BUMPED TO 4096: Give it room to think!
+        **kwargs,
+    ):
+        messages = chat_history.copy() if chat_history else []
+        messages.append(await self.construct_prompt(prompt, OPENAIEnum.USER.value))
+
+        call_params = {
+            "temperature": temperature or self.default_temperature,
+            "max_tokens": max_output_tokens or 4096,
+            **kwargs,
+        }
+
+        try:
+            response = await self.client.chat.completions.create(
+                model=self.generation_model_id,
+                messages=messages,
+                stream=True,
+                **call_params,
+            )
+
+            async for chunk in response:
+                choices = getattr(chunk, "choices", [])
+                if not choices:
+                    continue
+
+                delta = getattr(choices[0], "delta", None)
+                if not delta:
+                    continue
+
+                content = getattr(delta, "content", "") or ""
+                reasoning = getattr(delta, "reasoning", "") or getattr(delta, "reasoning_content", "") or ""
+
+                if reasoning:
+                    yield {"type": "thinking", "text": reasoning}
+                elif content:
+                    yield {"type": "answer", "text": content}
+
+        except Exception as e:
+            logger.exception("Stream failed internally.")
+            yield f"\n\n[INTERNAL STREAM ERROR]: {str(e)}"
+
+    @validate_llm_client
     async def generate_embedding(self, texts: list[str], input_type: str = None, **kwargs) -> list[List[float]]:
         """
         Calls the OpenAI Embeddings API to convert text to a vector.

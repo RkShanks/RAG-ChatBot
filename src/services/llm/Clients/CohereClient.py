@@ -97,6 +97,39 @@ class CohereClient(LLMInterface):
             raise
 
     @validate_llm_client
+    async def generate_text_stream(
+        self, prompt: str, chat_history: List[Dict[str, str]] = None, max_output_tokens: int = None, **kwargs
+    ):
+        """
+        Calls the Cohere Chat API with streaming enabled.
+        """
+        cohere_history = chat_history.copy() if chat_history else []
+        cohere_history.append(await self.construct_prompt(prompt, CohereEnum.USER.value))
+
+        # Merge defaults, explicitly preferring max_output_tokens if provided
+        call_params = {
+            "temperature": self.default_temperature,
+            "max_tokens": max_output_tokens or self.default_max_tokens,
+            **kwargs,
+        }
+
+        try:
+            response = await self.client.chat_stream(
+                model=self.generation_model_id,
+                messages=cohere_history,
+                **call_params,
+            )
+
+            async for event in response:
+                if event and event.type == "content-delta":
+                    if event.delta and event.delta.message and event.delta.message.content:
+                        yield {"type": "answer", "text": event.delta.message.content.text}
+
+        except Exception:
+            logger.exception(f"Cohere text stream generation failed using model '{self.generation_model_id}'")
+            raise
+
+    @validate_llm_client
     async def generate_embedding(
         self, texts: list[str], input_type: str = InputTypeEnum.Document.value, **kwargs
     ) -> list[List[float]]:
