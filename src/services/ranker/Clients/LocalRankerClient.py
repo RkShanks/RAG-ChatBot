@@ -5,6 +5,8 @@ from typing import List
 
 from sentence_transformers import CrossEncoder
 
+from helpers.exceptions import CustomAPIException
+from helpers.ResponseEnums import ResponseSignal
 from models.db_schemes import RetrievedDocument
 
 from ..RankerInterface import RankerInterface
@@ -22,16 +24,23 @@ class LocalRankerClient(RankerInterface):
         # 2. Build the final path: src/assets/local_models
         cache_dir = src_dir / "assets" / "local_models"
 
-        # 3. Create the folder if it doesn't exist yet
-        cache_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            # 3. Create the folder if it doesn't exist yet
+            cache_dir.mkdir(parents=True, exist_ok=True)
 
-        # This downloads to your HuggingFace cache on first run
-        self.model = CrossEncoder(
-            model_id,
-            cache_folder=str(cache_dir),
-            trust_remote_code=True,
-        )
-        logger.info("Local Ranker loaded successfully.")
+            # This downloads to your HuggingFace cache on first run
+            self.model = CrossEncoder(
+                model_id,
+                cache_folder=str(cache_dir),
+                trust_remote_code=True,
+            )
+            logger.info("Local Ranker loaded successfully.")
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.MODEL_LOADING_FAILED,
+                status_code=500,
+                dev_detail=f"Failed to load local cross-encoder model '{model_id}' into cache {cache_dir}.",
+            ) from e
 
     async def rerank(self, query: str, documents: List[RetrievedDocument], top_k: int = 5) -> List[RetrievedDocument]:
         if not documents:
@@ -59,6 +68,9 @@ class LocalRankerClient(RankerInterface):
             logger.debug(f"Local Cross-Encoder reranked {len(documents)} docs down to {len(best_docs)}")
             return best_docs
 
-        except Exception:
-            logger.exception("Local Reranking failed.")
-            raise
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.RERANKING_FAILED,
+                status_code=500,
+                dev_detail=f"Local Cross-Encoder math failed on {len(sentence_pairs)} sentence pairs.",
+            ) from e

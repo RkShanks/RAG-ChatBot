@@ -3,6 +3,8 @@ from typing import Any, Dict, List, Optional
 
 from qdrant_client import AsyncQdrantClient, models
 
+from helpers.exceptions import CustomAPIException
+from helpers.ResponseEnums import ResponseSignal
 from models.db_schemes import DocumentChunk
 
 from ..VectorDBEnums import DistanceMetricEnum
@@ -46,26 +48,37 @@ class QdrantClient(VectorDBInterface):
                 self.client = AsyncQdrantClient(location=":memory:")
                 logger.warning("Connected to Qdrant IN-MEMORY. Data will be lost on restart.")
 
-        except Exception:
-            logger.exception("Failed to connect to Qdrant")
-            raise
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.DB_CONNECTION_FAILED,
+                status_code=503,
+                dev_detail=f"Failed to connect to Qdrant at {self.url or self.path}",
+            ) from e
 
     async def disconnect(self) -> None:
         try:
             await self.client.close()
             self.client = None
             logger.info("Successfully disconnected from Qdrant")
-        except Exception:
-            logger.exception("Failed to disconnect from Qdrant")
-            raise
+
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.INTERNAL_SERVER_ERROR,
+                status_code=500,
+                dev_detail="Failed to gracefully disconnect from Qdrant.",
+            ) from e
 
     async def is_collection_exist(self, collection_name: str) -> bool:
         try:
             collection = await self.client.collection_exists(collection_name=collection_name)
             return collection
-        except Exception:
-            logger.exception(f"Failed to check if collection '{collection_name}' exists")
-            raise
+
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.DB_CONNECTION_FAILED,
+                status_code=503,
+                dev_detail=f"Failed to check if collection '{collection_name}' exists.",
+            ) from e
 
     async def list_all_collections(self) -> List:
         try:
@@ -73,18 +86,25 @@ class QdrantClient(VectorDBInterface):
             logger.info("Successfully listed all collections")
             return response
 
-        except Exception:
-            logger.exception("Failed to list all collections")
-            raise
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.DB_CONNECTION_FAILED,
+                status_code=503,
+                dev_detail="Failed to fetch the list of all Qdrant collections.",
+            ) from e
 
     async def get_collection_info(self, collection_name: str) -> Dict:
         try:
             info = await self.client.get_collection(collection_name=collection_name)
             logger.info(f"Successfully retrieved collection info for collection '{collection_name}'")
             return info.model_dump()
-        except Exception:
-            logger.exception(f"Failed to retrieve collection info for collection '{collection_name}'")
-            raise
+
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.COLLECTION_INFO_FAILED,
+                status_code=500,
+                dev_detail=f"Failed to retrieve metadata for collection '{collection_name}'.",
+            ) from e
 
     async def delete_collection(self, collection_name: str) -> bool:
         try:
@@ -94,9 +114,13 @@ class QdrantClient(VectorDBInterface):
                 return True
             logger.info(f"Collection: {collection_name} does not exist")
             return False
-        except Exception:
-            logger.exception(f"Failed to delete collection: {collection_name}")
-            raise
+
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.INTERNAL_SERVER_ERROR,
+                status_code=500,
+                dev_detail=f"Failed to delete collection: {collection_name}",
+            ) from e
 
     async def create_collection(
         self,
@@ -141,20 +165,23 @@ class QdrantClient(VectorDBInterface):
             logger.info(f"Created Hybrid-ready collection: {collection_name} (Size: {vector_size})")
             return True
 
-        except Exception:
-            logger.exception(f"Failed to create collection: {collection_name}")
-            raise
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.COLLECTION_CREATION_FAILED,
+                status_code=500,
+                dev_detail=f"Failed to create collection '{collection_name}' with size {vector_size}.",
+            ) from e
 
     async def insert_one(self, collection_name: str, document: DocumentChunk) -> bool:
         result = await self.insert_many(collection_name, [document])
         return result == 0
 
-    async def insert_many(self, collection_name: str, documents: List[DocumentChunk], batch_size: int = 100) -> bool:
+    async def insert_many(self, collection_name: str, documents: List[DocumentChunk], batch_size: int = 100) -> int:
         logger.debug(f"Inserting {len(documents)} documents into collection: {collection_name}")
 
         if not await self.is_collection_exist(collection_name):
             logger.warning(f"Collection {collection_name} does not exist.")
-            return False
+            return len(documents)
 
         points = self.documents_to_points(documents)
         failed_inserts = 0
@@ -166,12 +193,15 @@ class QdrantClient(VectorDBInterface):
                     collection_name=collection_name,
                     points=batch,
                 )
-            except Exception:
+
+            except Exception as e:
                 failed_inserts += len(batch)
-                logger.exception(f"Failed to insert batch number {i // batch_size} into {collection_name}.")
+                logger.error(f"Batch {i // batch_size} failed insertion. Error: {str(e)}")
                 continue
 
-        logger.info(f"Inserted {len(documents)} chunks into {collection_name} with failed inserts: {failed_inserts}")
+        logger.info(
+            f"Inserted {len(documents) - failed_inserts} chunks out of total {len(documents)} into {collection_name}. Failed: {failed_inserts}"
+        )
         return failed_inserts
 
     def documents_to_points(self, documents: List[DocumentChunk]) -> List[models.PointStruct]:
@@ -245,9 +275,12 @@ class QdrantClient(VectorDBInterface):
                     query=models.FusionQuery(fusion=models.Fusion.RRF),
                     limit=limit,
                 )
-            except Exception:
-                logger.exception(f"Failed to perform hybrid search for collection: {collection_name}")
-                raise
+            except Exception as e:
+                raise CustomAPIException(
+                    signal_enum=ResponseSignal.DB_CONNECTION_FAILED,
+                    status_code=503,
+                    dev_detail=f"Hybrid search crashed on collection '{collection_name}'.",
+                ) from e
 
         else:
             # Standard Dense Search (If no sparse keywords were provided)
@@ -260,9 +293,12 @@ class QdrantClient(VectorDBInterface):
                     query_filter=query_filter,
                     limit=limit,
                 )
-            except Exception:
-                logger.exception(f"Failed to perform dense search for collection: {collection_name}")
-                raise
+            except Exception as e:
+                raise CustomAPIException(
+                    signal_enum=ResponseSignal.DB_CONNECTION_FAILED,
+                    status_code=503,
+                    dev_detail=f"Dense search crashed on collection '{collection_name}'.",
+                ) from e
 
         # 3. Standardize Output format for your application
         formatted_results = []

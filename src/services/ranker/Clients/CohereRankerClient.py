@@ -3,6 +3,8 @@ from typing import List
 
 import cohere
 
+from helpers.exceptions import CustomAPIException
+from helpers.ResponseEnums import ResponseSignal
 from models.db_schemes import RetrievedDocument
 
 from ..RankerInterface import RankerInterface
@@ -13,7 +15,11 @@ logger = logging.getLogger(__name__)
 class CohereRankerClient(RankerInterface):
     def __init__(self, api_key: str, model_id: str = "rerank-v4.0-fast"):
         if not api_key:
-            raise ValueError("Cohere API key required for Reranking.")
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.API_KEY_MISSING,
+                status_code=500,
+                dev_detail="Cohere API key missing during CohereRankerClient initialization.",
+            )
 
         # Note: Cohere V2 Async Client
         self.client = cohere.AsyncClientV2(api_key=api_key)
@@ -53,6 +59,9 @@ class CohereRankerClient(RankerInterface):
             logger.debug(f"Cohere successfully reranked {len(documents)} docs down to {len(reranked_docs)}")
             return reranked_docs
 
-        except Exception:
-            logger.exception("Cohere Reranking failed.")
-            raise
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.RERANKING_FAILED,
+                status_code=502,
+                dev_detail=f"Cohere API failed to rerank {len(documents)} chunks using model '{self.model_id}'.",
+            ) from e

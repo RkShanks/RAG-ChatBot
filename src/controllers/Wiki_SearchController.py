@@ -5,6 +5,8 @@ import wikipediaapi
 from fastapi import UploadFile
 
 from helpers.config import get_settings
+from helpers.exceptions import CustomAPIException
+from helpers.ResponseEnums import ResponseSignal
 from models import ProcessingEnums
 
 from .BaseController import BaseController
@@ -35,9 +37,11 @@ class Wiki_SearchController(BaseController):
                 return None
 
         except Exception as e:
-            # We catch it, log it, and re-raise it so the global handler can send a 500 error.
-            logger.error(f"Failed to communicate with Wikipedia API for query '{query}': {e}")
-            raise e
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.WIKI_SEARCH_FAILED,
+                status_code=502,  # 502 Bad Gateway because Wikipedia's server failed
+                dev_detail=f"Failed to communicate with Wikipedia API for query '{query}'.",
+            ) from e
 
     def get_UploadFile(self, page):
         logger.debug(f"Converting Wikipedia page '{page.title}' into an in-memory UploadFile.")
@@ -49,7 +53,7 @@ class Wiki_SearchController(BaseController):
         # Calculate size for the log
         file_size_kb = len(file_bytes) / 1024
 
-        # step 2 : create a UploadFile object
+        # step 2 : create an UploadFile object
         filename = f"{page.title}{ProcessingEnums.MD.value}"
         upload_file = UploadFile(
             filename=filename,

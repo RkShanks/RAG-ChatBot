@@ -5,6 +5,8 @@ from google import genai
 from google.genai import types
 
 from helpers.decorators import validate_llm_client
+from helpers.exceptions import CustomAPIException
+from helpers.ResponseEnums import ResponseSignal
 
 from ..LLMEnums import GeminiEnum, InputTypeEnum
 from ..LLMInterface import LLMInterface
@@ -21,7 +23,11 @@ class GeminiClient(LLMInterface):
         default_temperature: float = float(GeminiEnum.DEFAULT_TEMPERATURE.value),
     ):
         if not api_key:
-            raise ValueError("A Gemini API key must be provided.")
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.API_KEY_MISSING,
+                status_code=500,
+                dev_detail="Gemini API key missing during GeminiClient initialization.",
+            )
 
         # Initialize the new unified Async Client
         self.client = genai.Client(api_key=api_key).aio
@@ -113,14 +119,23 @@ class GeminiClient(LLMInterface):
             content = response.text
 
             if not content or not isinstance(content, str) or not content.strip():
-                logger.error(f"Gemini returned an empty response for model '{self.generation_model_id}'")
-                raise ValueError("Received empty text response from LLM.")
+                raise CustomAPIException(
+                    signal_enum=ResponseSignal.NLP_CHAT_FAILED,
+                    status_code=502,
+                    dev_detail=f"Gemini returned an empty response for model '{self.generation_model_id}'",
+                )
 
             return content.strip()
 
-        except Exception:
-            logger.exception(f"Gemini text generation failed using model '{self.generation_model_id}'")
+        except CustomAPIException:
+            # The Pass-Through: Prevents double-wrapping our validation errors
             raise
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.NLP_CHAT_FAILED,
+                status_code=502,
+                dev_detail=f"Gemini text generation crashed using model '{self.generation_model_id}'.",
+            ) from e
 
     @validate_llm_client
     async def generate_text_stream(
@@ -167,9 +182,12 @@ class GeminiClient(LLMInterface):
                 if chunk.text:
                     yield {"type": "answer", "text": chunk.text}
 
-        except Exception:
-            logger.exception(f"Gemini text stream generation failed using model '{self.generation_model_id}'")
-            raise
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.NLP_CHAT_FAILED,
+                status_code=502,
+                dev_detail=f"Gemini text stream generation crashed using model '{self.generation_model_id}'.",
+            ) from e
 
     @validate_llm_client
     async def generate_embedding(
@@ -193,17 +211,28 @@ class GeminiClient(LLMInterface):
 
             # --- OUTPUT VALIDATION ---
             if not response.embeddings or not isinstance(response.embeddings, list):
-                logger.error("Gemini returned an invalid embedding format.")
-                raise ValueError("Received invalid embedding format from LLM.")
+                raise CustomAPIException(
+                    signal_enum=ResponseSignal.EMBEDDING_FAILED,
+                    status_code=502,
+                    dev_detail="Gemini returned an invalid embedding format.",
+                )
 
             embeddings = [embedding.values for embedding in response.embeddings]
 
             if self.embedding_size and len(embeddings[0]) != self.embedding_size:
-                logger.error(f"Dimensionality mismatch! Expected {self.embedding_size}, got {len(embeddings[0])}.")
-                raise ValueError(f"Embedding dimension mismatch. Expected {self.embedding_size}.")
+                raise CustomAPIException(
+                    signal_enum=ResponseSignal.EMBEDDING_FAILED,
+                    status_code=502,
+                    dev_detail=f"Dimensionality mismatch! Expected {self.embedding_size}, got {len(embeddings[0])}.",
+                )
 
             return embeddings
 
-        except Exception:
-            logger.exception(f"Gemini embedding generation failed using model '{self.embedding_model_id}'")
+        except CustomAPIException:
             raise
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.EMBEDDING_FAILED,
+                status_code=502,
+                dev_detail=f"Gemini embedding generation crashed using model '{self.embedding_model_id}'.",
+            ) from e

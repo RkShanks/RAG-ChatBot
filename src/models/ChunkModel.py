@@ -80,13 +80,11 @@ class ChunkModel:
         :return: True if the collection_name was exist, False otherwise.
         """
         logger.debug(f"Deleting chunks for collection_name: {collection_name}")
-        try:
-            result = await self.vector_db_client.delete_collection(collection_name=collection_name)
-            logger.info(f"Deleted collection: {collection_name}")
-            return result
-        except Exception:
-            logger.exception(f"Error deleting chunks for collection_name: {collection_name}")
-            raise
+
+        result = await self.vector_db_client.delete_collection(collection_name=collection_name)
+
+        logger.info(f"Deleted collection: {collection_name}")
+        return result
 
     async def create_document_chunks(
         self,
@@ -129,15 +127,13 @@ class ChunkModel:
         :return: True if the collection was successfully created, False otherwise.
         """
         logger.debug(f"Creating collection: {collection_name}")
-        try:
-            result = await self.vector_db_client.create_collection(
-                collection_name=collection_name,
-                vector_size=vector_size,
-                distance_metric=distance_metric,
-                do_reset=do_reset,
-            )
-            logger.info(f"Created collection: {collection_name}")
-            return result
-        except Exception:
-            logger.exception(f"Error creating collection: {collection_name}")
-            raise
+
+        result = await self.vector_db_client.create_collection(
+            collection_name=collection_name,
+            vector_size=vector_size,
+            distance_metric=distance_metric,
+            do_reset=do_reset,
+        )
+
+        logger.info(f"Created collection: {collection_name}")
+        return result

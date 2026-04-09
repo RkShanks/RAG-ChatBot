@@ -23,90 +23,53 @@ async def wiki_search(
     app_settings: Settings = Depends(get_settings),
 ):
     logger.debug(f"Received wiki search request for project '{project_id}' with query '{wiki_search_request.query}'")
-    # Implement the logic to perform a wiki search based on the query and project_id
+
+    # 1. Get or Create Project (Let It Crash if MongoDB fails)
     project_model = ProjectModel(db_client=request.app.state.db_client)
     project = await project_model.get_project_or_create(project_id=project_id)
 
-    # You can use the DataController to handle any necessary data operations
     data_controller = DataController()
     wiki_search_controller = Wiki_SearchController()
 
-    # search for the query and return the results
-    try:
-        page = wiki_search_controller.search_wikipedia(
-            query=wiki_search_request.query, language=wiki_search_request.lang
-        )
-    except Exception:
-        logger.exception(
-            f"Exception occurred while searching Wikipedia for query '{wiki_search_request.query}' in project '{project_id}'"
-        )
-        return JSONResponse(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            content={"search_status": ResponseSignal.WIKI_SEARCH_ERROR.value},
-        )
-
+    # 2. Search Wikipedia (Let It Crash if the Wiki API goes down)
+    page = wiki_search_controller.search_wikipedia(query=wiki_search_request.query, language=wiki_search_request.lang)
     if page is None:
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,
             content={"search_status": ResponseSignal.WIKI_SEARCH_NO_RESULTS.value},
         )
 
-    # get the UploadFile object for the page
+    # 3. Convert page to UploadFile
     upload_file = wiki_search_controller.get_UploadFile(page)
 
-    # save the file using the DataController
+    # 4. Save the file to disk
     file_dir_path, file_id = data_controller.generate_unique_file_path(
         file_name=upload_file.filename,
         project_id=project_id,
     )
-    try:
-        _ = await data_controller.save_file(
-            file=upload_file,
-            file_path=file_dir_path,
-            project_id=project_id,
-            app_settings=app_settings,
-        )
-    except Exception:
-        logger.exception(
-            f"Exception occurred while saving wiki search result for query '{wiki_search_request.query}' in project '{project_id}'"
-        )
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={
-                "search_status": ResponseSignal.WIKI_SEARCH_RESULTS_FOUND.value,
-                "signal": ResponseSignal.WIKI_FILE_UPLOAD_FAILED.value,
-            },
-        )
 
-    logger.info(
-        f"Wiki search result for query '{wiki_search_request.query}' uploaded successfully as file '{file_id}' in project '{project_id}'"
+    await data_controller.save_file(
+        file=upload_file,
+        file_path=file_dir_path,
+        project_id=project_id,
+        app_settings=app_settings,
     )
+    logger.info(f"Wiki search result for '{wiki_search_request.query}' uploaded successfully as file '{file_id}'.")
 
+    # 5. Create Asset Record
     asset_model = AssetModel(db_client=request.app.state.db_client)
-    try:
-        asset_record = await asset_model.create_from_file(
-            project_id=str(project.id),
-            file_id=file_id,
-            file_path=file_dir_path,
-        )
-        logger.info(
-            "Successfully processed: Creating asset record for file '{upload_file.filename}' in project '{project_id}'"
-        )
-        return JSONResponse(
-            content={
-                "search_status": ResponseSignal.WIKI_SEARCH_RESULTS_FOUND.value,
-                "signal": ResponseSignal.WIKI_FILE_UPLOADED_SUCCESSFULLY.value,
-                "file_id": str(asset_record.id),
-            }
-        )
+    asset_record = await asset_model.create_from_file(
+        project_id=str(project.id),
+        file_id=file_id,
+        file_path=file_dir_path,
+    )
+    logger.info(f"Successfully created asset record for file '{upload_file.filename}' in project '{project_id}'")
 
-    except Exception:
-        logger.exception(
-            f"Exception occurred while creating asset record for file '{upload_file.filename}' in project '{project_id}'"
-        )
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={
-                "signal": ResponseSignal.ASSET_CREATION_FAILED.value,
-            },
-        )
+    # 6. Return Success
+    return JSONResponse(
+        content={
+            "search_status": ResponseSignal.WIKI_SEARCH_RESULTS_FOUND.value,
+            "signal": ResponseSignal.WIKI_FILE_UPLOADED_SUCCESSFULLY.value,
+            "file_id": str(asset_record.id),
+        }
+    )

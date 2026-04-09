@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from controllers import NLPController
 from helpers.config import Settings, get_settings
+from helpers.exceptions import CustomAPIException
 from models import ResponseSignal
 from routes.schemes.nlp import SearchRequest
 
@@ -79,15 +80,23 @@ async def chat_with_project(
             )
 
             async for chunk in stream:
-                # 'chunk' is now the dictionary we created in the client
-                # e.g., {"type": "answer", "text": "مرحبا"}
+                # 'chunk' is the dictionary we created in the client e.g., {"type": "answer", "text": "مرحبا"}
                 safe_data = json.dumps(chunk, ensure_ascii=False)
                 yield f"data: {safe_data}\n\n"
 
-        except Exception as e:
-            logger.exception(f"Error during streaming response for project {project_id}: {e}")
-            error_data = json.dumps({"text": f"\n\n[ERROR] {str(e)}"})
-            yield f"data: {error_data}\n\n"
+        except CustomAPIException as e:
+            # SSE Error Handling: We catch our clean custom exception and send it as an SSE error event
+            # so the frontend UI can display the precise dev_detail without breaking the chat window!
+            error_payload = {"type": "error", "text": e.dev_detail, "signal": e.signal_enum.value}
+            safe_data = json.dumps(error_payload, ensure_ascii=False)
+            yield f"data: {safe_data}\n\n"
+
+        except Exception:
+            # Catch-all for unexpected Python crashes mid-stream
+            logger.exception(f"Unexpected stream crash for project {project_id}")
+            error_payload = {"type": "error", "text": "An unexpected internal server error occurred during streaming."}
+            safe_data = json.dumps(error_payload, ensure_ascii=False)
+            yield f"data: {safe_data}\n\n"
 
     return StreamingResponse(
         raw_generator(),
@@ -112,26 +121,19 @@ async def ask_project(
         reranker_client=request.app.state.ranker_client,
     )
 
-    try:
-        response, history = await nlp_controller.ask_question(
-            project_id=project_id,
-            query=search_request.query,
-            chat_history=search_request.chat_history,
-            limit=search_request.limit,
-            target_locale=search_request.target_locale,
-        )
+    response, history = await nlp_controller.ask_question(
+        project_id=project_id,
+        query=search_request.query,
+        chat_history=search_request.chat_history,
+        limit=search_request.limit,
+        target_locale=search_request.target_locale,
+    )
 
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content={
-                "signal": ResponseSignal.NLP_CHAT_SUCCESSFUL.value,
-                "response": response,
-                "chat_history": history,
-            },
-        )
-    except Exception as e:
-        logger.exception(f"Error during ask response for project {project_id}: {e}")
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"error": str(e)},
-        )
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "signal": ResponseSignal.NLP_CHAT_SUCCESSFUL.value,
+            "response": response,
+            "chat_history": history,
+        },
+    )

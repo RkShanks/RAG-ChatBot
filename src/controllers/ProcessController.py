@@ -8,7 +8,9 @@ from fastapi import status
 from langchain_docling import DoclingLoader
 from langchain_docling.loader import ExportType
 
-from models import AssetModel, AssetTypeEnum, ChunkModel, ProjectModel, ResponseSignal
+from helpers.exceptions import CustomAPIException
+from helpers.ResponseEnums import ResponseSignal
+from models import AssetModel, AssetTypeEnum, ChunkModel, ProjectModel
 from models.db_schemes import DataChunk, DocumentChunk
 from services.llm import InputTypeEnum, LLMInterface
 from services.vectordb import VectorDBEnums, VectorDBInterface
@@ -54,7 +56,7 @@ class ProcessController(BaseController):
         based on the active embedding client.
         """
         client_type = self.embedding_client.__class__.__name__
-        model_id = self.embedding_client.embedding_model_id
+        model_id = getattr(self.embedding_client, "embedding_model_id", None)
 
         try:
             if client_type == "OpenAIClient":
@@ -85,8 +87,8 @@ class ProcessController(BaseController):
         except ImportError as e:
             logger.warning(f"Missing tokenizer library: {e}. Falling back to Docling default.")
             return None
-        except Exception:
-            logger.exception(f"Could not load tokenizer for {model_id}. Falling back to default.")
+        except Exception as e:
+            logger.warning(f"Could not load tokenizer for {model_id}: {str(e)}. Falling back to default.")
             return None
 
         return None
@@ -95,8 +97,11 @@ class ProcessController(BaseController):
         file_path = os.path.join(self.project_dir, file_id)
 
         if not os.path.exists(file_path):
-            logger.warning(f"File not found at path: {file_path}")
-            return None
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.FILE_NOT_FOUND,
+                status_code=404,
+                dev_detail=f"Cannot chunk file. File not found at path: {file_path}",
+            )
 
         logger.debug(f"Initializing DoclingLoader for {file_id}...")
         # Grab the specific mathematical dictionary for the active AI
@@ -115,9 +120,12 @@ class ProcessController(BaseController):
             logger.info(f"Successfully chunked file '{file_id}' into {len(chunks)} chunks.")
             return chunks
 
-        except Exception:
-            logger.exception(f"Error during chunking of file '{file_id}'")
-            raise
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.FILE_UPLOADED_FAILED,
+                status_code=500,
+                dev_detail=f"Docling failed to parse and chunk the file '{file_id}'.",
+            ) from e
 
     async def get_assets_to_process(self, file_id: str = None) -> list:
         """Helper to fetch the exact assets requested by the user."""
@@ -150,7 +158,7 @@ class ProcessController(BaseController):
         logger.debug(f"Generating embeddings concurrently for {len(cleaned_chunks)} chunks...")
         needs_sparse = self.vector_client.is_sparse_needed()
         packaged_chunks = []
-        # Loop through the chunks in groups of 90
+
         for i in range(0, len(cleaned_chunks), batch_size):
             batch = cleaned_chunks[i : i + batch_size]
 
@@ -159,16 +167,23 @@ class ProcessController(BaseController):
             texts = [chunk.chunk_text for chunk in batch]
 
             try:
-                # 1. Generate Dense Embeddings (External API - Batched)
+                # 1. Generate Dense Embeddings
                 dense_embeddings = await self.embedding_client.generate_embedding(
                     texts=texts,
                     input_type=InputTypeEnum.Document.value,
                 )
 
-                # 2. Generate Sparse Embeddings (Local Splade Model - No rate limits)
-                if needs_sparse:
-                    sparse_tasks = [self.sparse_client.generate_sparse_embedding(text) for text in texts]
-                    sparse_embeddings = await asyncio.gather(*sparse_tasks)
+                # 2. Generate Sparse Embeddings
+                sparse_embeddings = [None] * len(batch)
+                if needs_sparse and self.sparse_client:
+                    try:
+                        sparse_tasks = [self.sparse_client.generate_sparse_embedding(text) for text in texts]
+                        sparse_embeddings = await asyncio.gather(*sparse_tasks)
+
+                    except CustomAPIException as e:
+                        logger.warning(
+                            f"Sparse embedding failed for batch. Falling back to dense-only. Reason: {e.dev_detail}"
+                        )
 
                 # 3. Package the vectors back into the chunk objects
                 for j, chunk in enumerate(batch):
@@ -184,9 +199,8 @@ class ProcessController(BaseController):
                 if i + batch_size < len(cleaned_chunks):
                     logger.debug("Sleeping for 2 seconds to respect API rate limits...")
                     await asyncio.sleep(2)
-            except Exception:
-                logger.error(f"Critical error processing batch {i} to {i + batch_size}")
-                # Depending on your pipeline, you can raise the error here or continue to the next batch
+
+            except CustomAPIException:
                 raise
 
         logger.info(f"Successfully embedded and packaged {len(packaged_chunks)} chunks.")
@@ -216,23 +230,31 @@ class ProcessController(BaseController):
                 do_reset=do_reset,
             )
             logger.info(f"Successfully {operation_name} collection '{collection_name}'")
-        except Exception:
-            logger.exception(f"Failed to {operation_name} collection '{collection_name}'")
+
+        except CustomAPIException as e:
+            # Translate CustomException into the old dictionary format the route expects
             return {
                 "status": status.HTTP_500_INTERNAL_SERVER_ERROR,
                 "content": {
                     "signal": ResponseSignal.COLLECTION_CREATION_FAILED.value,
+                    "detail": e.dev_detail,
                 },
             }
 
         # STEP 2: Fetch Target Assets
-        project_assets = await self.get_assets_to_process(file_id)
-        if not project_assets:
-            logger.warning(f"No assets found to process for project '{self.project_id}'.")
+        try:
+            project_assets = await self.get_assets_to_process(file_id)
+            if not project_assets:
+                return {
+                    "status": status.HTTP_404_NOT_FOUND,
+                    "content": {"signal": ResponseSignal.FILE_NOT_FOUND.value},
+                }
+        except CustomAPIException as e:
             return {
-                "status": status.HTTP_404_NOT_FOUND,
+                "status": status.HTTP_500_INTERNAL_SERVER_ERROR,
                 "content": {
-                    "signal": ResponseSignal.FILE_NOT_FOUND.value,
+                    "signal": ResponseSignal.ASSET_RETRIEVAL_FAILED.value,
+                    "detail": e.dev_detail,
                 },
             }
 
@@ -248,9 +270,6 @@ class ProcessController(BaseController):
             try:
                 # A. Parse PDF
                 raw_chunks = await self.get_file_chunks(file_id=file_name)
-                if raw_chunks is None:
-                    failed_files.append(file_name)
-                    continue
 
                 # B. Clean Metadata
                 cleaned_chunks = await self.chunk_model.clean_chunks(
@@ -270,20 +289,19 @@ class ProcessController(BaseController):
                         chunks=document_chunks,
                         batch_size=batch_size,
                     )
+
                     if inserted:
                         total_inserted_count += inserted
                         failed_inserted_count = len(document_chunks) - inserted
                         total_failed_inserted_count += failed_inserted_count
+
                         if failed_inserted_count > 0:
                             failed_files.append(file_name)
                             logger.warning(
                                 f"Inserted {len(document_chunks)} chunks for '{file_name}' with {failed_inserted_count} failed inserts."
                             )
                         else:
-                            logger.info(
-                                f"Inserted {len(document_chunks)} chunks for '{file_name}' with {failed_inserted_count} failed inserts."
-                            )
-
+                            logger.info(f"Fully inserted {len(document_chunks)} chunks for '{file_name}'.")
                     else:
                         failed_files.append(file_name)
                         logger.warning(f"Failed to insert any chunks for '{file_name}'")
@@ -291,8 +309,10 @@ class ProcessController(BaseController):
                     logger.warning(f"No valid embedded chunks generated for '{file_name}'.")
                     failed_files.append(file_name)
 
-            except Exception:
-                logger.exception(f"Critical pipeline failure for file: {file_name}")
+            except CustomAPIException as e:
+                # Fail Safe: This specific file crashed (e.g. Docling failed, or AI token limit hit)
+                # We log it, add it to the fail list, but CONTINUE to the next file!
+                logger.error(f"Critical pipeline failure for file '{file_name}': {e.dev_detail}")
                 failed_files.append(file_name)
                 continue
 
@@ -323,9 +343,11 @@ class ProcessController(BaseController):
                     "info": info,
                 },
             }
-        except Exception:
-            logger.exception(f"Failed to get collection info for '{collection_name}'")
+        except CustomAPIException as e:
             return {
                 "status": status.HTTP_500_INTERNAL_SERVER_ERROR,
-                "content": {"signal": ResponseSignal.COLLECTION_INFO_FAILED.value},
+                "content": {
+                    "signal": ResponseSignal.COLLECTION_INFO_FAILED.value,
+                    "detail": e.dev_detail,
+                },
             }

@@ -4,6 +4,9 @@ from typing import List, Tuple
 
 from pymongo import ReturnDocument
 
+from helpers.exceptions import CustomAPIException
+from helpers.ResponseEnums import ResponseSignal
+
 from .BaseDataModel import BaseDataModel
 from .db_schemes import Project
 from .enums.DataBaseEnum import DataBaseEnum
@@ -27,9 +30,12 @@ class ProjectModel(BaseDataModel):
             logger.info(f"Project created with ID: {project_data.project_id} (MongoDB ID: {result.inserted_id})")
             project_data.id = str(result.inserted_id)
 
-        except Exception:
-            logger.exception(f"Error creating project with ID: {project_data.project_id}")
-            raise
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.PROJECT_CREATION_FAILED,
+                status_code=500,
+                dev_detail=f"MongoDB failed to insert project '{project_data.project_id}'.",
+            ) from e
 
         return project_data
 
@@ -48,9 +54,12 @@ class ProjectModel(BaseDataModel):
             logger.info(f"Project retrieved or created with ID: {project_id} (MongoDB ID: {record['_id']})")
             return Project.model_validate(record)
 
-        except Exception:
-            logger.exception(f"Error in get_project_or_create for ID {project_id}")
-            raise
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.PROJECT_CREATION_FAILED,
+                status_code=500,
+                dev_detail=f"MongoDB failed to retrieve or upsert project '{project_id}'.",
+            ) from e
 
     async def get_all_projects(self, page: int, page_size: int) -> Tuple[List[Project], int]:
         logger.debug(f"Retrieving all projects with pagination - Page: {page}, Page Size: {page_size}")
@@ -59,9 +68,13 @@ class ProjectModel(BaseDataModel):
         try:
             total_documents = await self.collection.count_documents({})
             logger.info(f"Total projects in database: {total_documents}")
-        except Exception:
-            logger.exception("Error counting documents")
-            raise
+
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.PROJECT_RETRIEVAL_FAILED,
+                status_code=500,
+                dev_detail="MongoDB failed to count total projects for pagination.",
+            ) from e
 
         # 2. Calculate total pages cleanly using math.ceil
         total_pages = math.ceil(total_documents / page_size) if total_documents > 0 else 0
@@ -73,9 +86,12 @@ class ProjectModel(BaseDataModel):
             raw_documents = await cursor.to_list(length=page_size)
             logger.info(f"Fetched {len(raw_documents)} projects for page {page} with page size {page_size}")
 
-        except Exception:
-            logger.exception("Error fetching projects")
-            raise
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.PROJECT_RETRIEVAL_FAILED,
+                status_code=500,
+                dev_detail=f"MongoDB failed to fetch projects for page {page}.",
+            ) from e
 
         # 4. Parse the raw documents into Pydantic models
         projects = [Project.model_validate(doc) for doc in raw_documents]

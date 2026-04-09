@@ -3,9 +3,11 @@ import logging
 from fastapi import APIRouter, Depends, Request
 
 from helpers.config import Settings, get_settings
-from models.enums.ResponseEnums import ResponseSignal
+from helpers.exceptions import CustomAPIException
+from helpers.ResponseEnums import ResponseSignal
 
 logger = logging.getLogger(__name__)
+
 base_router = APIRouter(
     prefix="/api/v1",
     tags=["api_v1"],
@@ -19,7 +21,8 @@ async def welcome(request: Request, app_settings: Settings = Depends(get_setting
     app_version = app_settings.APP_VERSION
     db_client = request.app.state.db_client
 
-    db_connection_status = check_db_connection(db_client=db_client)
+    db_connection_status = await check_db_connection(db_client=db_client)
+
     return {
         "app_name": app_name,
         "app_version": app_version,
@@ -27,11 +30,14 @@ async def welcome(request: Request, app_settings: Settings = Depends(get_setting
     }
 
 
-def check_db_connection(db_client):
+async def check_db_connection(db_client):
     try:
-        # The ping command is used to check the connection to the database
-        db_client.command("ping")
+        await db_client.command("ping")
         return ResponseSignal.DB_CONNECTION_SUCCESS.value
-    except Exception:
-        logger.exception("Database connection failed")
-        return ResponseSignal.DB_CONNECTION_FAILED.value
+
+    except Exception as e:
+        raise CustomAPIException(
+            signal_enum=ResponseSignal.DB_CONNECTION_FAILED,
+            status_code=503,  # 503 Service Unavailable is the standard for failed health checks
+            dev_detail="Database ping failed during system health check.",
+        ) from e
