@@ -21,24 +21,39 @@ class DataController(BaseController):
         self.file_scalar = 1024 * 1024  # 1 MB in bytes
 
     def validate_uploaded_file(self, file: UploadFile):
-        logger.debug(f"Validating uploaded file: {file.filename} (type: {file.content_type}, size: {file.size} bytes)")
+        logger.debug(f"Validating: {file.filename} | MIME: {file.content_type}")
 
-        # Implement file validation logic based on self.app_settings.FILE_EXTENSIONS and self.app_settings.FILE_SIZE_LIMIT
-        if file.content_type not in self.app_settings.FILE_EXTENSIONS:
+        # 1. Define the strictly allowed extensions
+        allowed_extensions = {".pdf", ".txt", ".md", ".markdown"}
+
+        # 2. Extract the actual extension from the filename
+        file_ext = os.path.splitext(file.filename)[1].lower()
+
+        # 3. The Strict Check: It MUST have a valid extension AND the MIME type must be in .env file.
+        is_ext_valid = file_ext in allowed_extensions
+        is_mime_valid = file.content_type in self.app_settings.FILE_EXTENSIONS
+
+        if not is_ext_valid:
             raise CustomAPIException(
                 signal_enum=ResponseSignal.FILE_TYPE_NOT_SUPPORTED,
-                status_code=415,  # 415 Unsupported Media Type
-                dev_detail=f"Rejected '{file.filename}'. MIME type '{file.content_type}' is not allowed.",
+                status_code=415,
+                dev_detail=f"Rejected '{file.filename}'. Extension '{file_ext}' is not in the allowed list: {allowed_extensions}",
             )
 
+        if not is_mime_valid:
+            # If the extension is right but the MIME is weird, we still log it
+            logger.warning(
+                f"File '{file.filename}' has a valid extension but suspicious MIME type: {file.content_type}"
+            )
+
+        # 4. Check File Size
         if file.size > self.app_settings.FILE_MAX_SIZE * self.file_scalar:
             raise CustomAPIException(
                 signal_enum=ResponseSignal.FILE_SIZE_EXCEEDED,
-                status_code=413,  # 413 Payload Too Large
+                status_code=413,
                 dev_detail=f"Rejected '{file.filename}'. Size {file.size} exceeds the {self.app_settings.FILE_MAX_SIZE}MB limit.",
             )
 
-        logger.info(f"File '{file.filename}' passed validation checks.")
         return True
 
     def generate_unique_file_path(self, file_name: str, project_id: str):
