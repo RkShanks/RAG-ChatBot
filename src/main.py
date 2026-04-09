@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from helpers.config import get_settings
+from helpers.exceptions import CustomAPIException
 from helpers.logger import setup_logging
 from models import AssetModel, ProjectModel, ResponseSignal
 from routes import base, data, nlp, wiki_search
@@ -43,7 +44,7 @@ async def lifespan(app: FastAPI):
         # 4. Stop the server from starting if the DB is down!
         raise e
 
-    # 5. INITIALIZE INDEXES HERE! This ensures indexes are always created before any requests hit the server.
+    # 5. INITIALIZE INDEXES HERE!
     logger.info("Verifying database indexes...")
 
     project_model = ProjectModel(db_client=app.state.db_client)
@@ -53,14 +54,15 @@ async def lifespan(app: FastAPI):
     await asset_model.init_collection()
 
     try:
-        # Initialize GENERATION_BACKEND and EMBEDDING_BACKEND
+        # Initialize GENERATION, EMBEDDING, and SPARSE backends
         logger.info("Initializing LLM backends...")
         app.state.generation_client = LLMFactory.get_generation_client(settings)
         app.state.embedding_client = LLMFactory.get_embedding_client(settings)
         app.state.sparse_embedding_client = LLMFactory.get_sparse_embedding_client(settings)
         logger.info("✅ LLM backends initialized.")
-    except Exception:
+    except Exception as e:
         logger.exception("❌ CRITICAL: Failed to initialize LLM backend")
+        raise e
 
     try:
         # Initialize VECTOR_DB_BACKEND
@@ -72,18 +74,30 @@ async def lifespan(app: FastAPI):
         )
         await app.state.vector_db_client.connect()
         logger.info("✅ Vector Database backend initialized.")
-    except Exception:
+    except Exception as e:
         logger.exception("❌ CRITICAL: Failed to initialize Vector Database backend")
-        raise
-    app.state.ranker_client = RankerFactory.get_ranker_client(settings)
+        raise e
+
+    try:
+        # Initialize RANKER_BACKEND
+        logger.info("Initializing Ranker backend...")
+        app.state.ranker_client = RankerFactory.get_ranker_client(settings)
+        logger.info("✅ Ranker backend initialized.")
+    except Exception as e:
+        logger.exception("❌ CRITICAL: Failed to initialize Ranker backend")
+        raise e
+
     yield
 
-    # 6. Safely close the MongoDB client when the application shuts down
-    logger.info("Shutting down: Closing MongoDB connection...")
+    # 6. Safely close the clients when the application shuts down
+    logger.info("Shutting down: Closing connections...")
     if hasattr(app.state, "mongo_client"):
         app.state.mongo_client.close()
         logger.info("✅ MongoDB connection closed.")
-    await app.state.vector_db_client.disconnect()
+
+    if hasattr(app.state, "vector_db_client"):
+        await app.state.vector_db_client.disconnect()
+        logger.info("✅ Vector DB connection closed.")
 
 
 app = FastAPI(lifespan=lifespan)
@@ -113,6 +127,37 @@ async def global_exception_handler(request: Request, exc: Exception):
             # 2. Give the ID to the frontend so they can report it!
             "request_id": req_id,
             "dev_detail": str(exc),
+        },
+    )
+
+
+@app.exception_handler(CustomAPIException)
+async def custom_api_exception_handler(request: Request, exc: CustomAPIException):
+    """
+    Catches the CustomAPIException and formats it into a clean JSON response for the frontend,
+    while logging the exact business context to the terminal.
+    """
+    # Grab the unique ID for this specific web request
+    req_id = correlation_id.get()
+
+    method = request.method
+    url = request.url.path
+
+    # Log the specific business logic failure (exc_info=exc prints the chained traceback!)
+    logger.error(
+        f"⚠️ Custom API Error [{exc.status_code}] on {method} {url} | "
+        f"Signal: {exc.signal.value if hasattr(exc.signal, 'value') else exc.signal} | "
+        f"Detail: {exc.dev_detail}",
+        exc_info=exc,
+    )
+
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "signal": exc.signal.value if hasattr(exc.signal, "value") else str(exc.signal),
+            "message": exc.message,
+            "request_id": req_id,
+            "dev_detail": exc.dev_detail,
         },
     )
 
