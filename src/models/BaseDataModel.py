@@ -1,6 +1,8 @@
 import logging
 
 from helpers.config import Settings, get_settings
+from helpers.exceptions import CustomAPIException
+from helpers.ResponseEnums import ResponseSignal
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +40,9 @@ class BaseDataModel:
             else:
                 logger.debug(f"No indexes defined in schema for {self.document_class.__name__}.")
 
-        except Exception:
-            logger.exception(f"Failed to create indexes for {self.collection.name}.")
-            raise
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.INDEX_CREATION_FAILED,
+                status_code=500,
+                dev_detail=f"MongoDB failed to create or verify indexes for collection '{self.collection.name}'.",
+            ) from e
