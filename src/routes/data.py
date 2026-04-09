@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Depends, Request, UploadFile, status
+from fastapi import APIRouter, Depends, Request, UploadFile
 from fastapi.responses import JSONResponse
 
 from controllers import DataController, ProcessController
@@ -23,62 +23,45 @@ async def upload_data(
     app_settings: Settings = Depends(get_settings),
 ):
     logger.debug(f"Received upload request for project '{project_id}' with file '{file.filename}'")
+
+    # 1. Get or Create Project
     project_model = ProjectModel(db_client=request.app.state.db_client)
     project = await project_model.get_project_or_create(project_id=project_id)
-    # validate file type
+
+    # 2. Validate File
     data_controller = DataController()
-    is_valid, signal = data_controller.validate_uploaded_file(file=file)
+    data_controller.validate_uploaded_file(file=file)
 
-    if not is_valid:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"signal": signal},
-        )
-
+    # 3. Generate Path
     file_dir_path, file_id = data_controller.generate_unique_file_path(
         file_name=file.filename,
         project_id=project_id,
     )
-    try:
-        _ = await data_controller.save_file(
-            file=file,
-            file_path=file_dir_path,
-            project_id=project_id,
-            app_settings=app_settings,
-        )
-    except Exception:
-        logger.exception(f"Exception occurred while saving file '{file.filename}' for project '{project_id}'")
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={
-                "signal": ResponseSignal.FILE_UPLOADED_FAILED.value,
-            },
-        )
-    logger.info(f"File uploaded successfully: {file_id}")
 
+    # 4. Save File to Disk
+    await data_controller.save_file(
+        file=file,
+        file_path=file_dir_path,
+        project_id=project_id,
+        app_settings=app_settings,
+    )
+    logger.info(f"File uploaded successfully to disk: {file_id}")
+
+    # 5. Save Asset to Database
     asset_model = AssetModel(db_client=request.app.state.db_client)
-    try:
-        asset_record = await asset_model.create_from_file(
-            project_id=str(project.id),
-            file_id=file_id,
-            file_path=file_dir_path,
-        )
-        return JSONResponse(
-            content={
-                "signal": ResponseSignal.FILE_UPLOADED_SUCCESSFULLY.value,
-                "file_id": str(asset_record.id),
-            },
-        )
-    except Exception:
-        logger.exception(
-            f"Exception occurred while creating asset record for file '{file.filename}' in project '{project_id}'"
-        )
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={
-                "signal": ResponseSignal.ASSET_CREATION_FAILED.value,
-            },
-        )
+    asset_record = await asset_model.create_from_file(
+        project_id=str(project.id),
+        file_id=file_id,
+        file_path=file_dir_path,
+    )
+
+    # 6. Return Success
+    return JSONResponse(
+        content={
+            "signal": ResponseSignal.FILE_UPLOADED_SUCCESSFULLY.value,
+            "file_id": str(asset_record.id),
+        },
+    )
 
 
 @data_router.post("/process/{project_id}")
