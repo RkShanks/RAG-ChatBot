@@ -4,6 +4,8 @@ from typing import Dict, List
 import cohere
 
 from helpers.decorators import validate_llm_client
+from helpers.exceptions import CustomAPIException
+from helpers.ResponseEnums import ResponseSignal
 
 from ..LLMEnums import CohereEnum, InputTypeEnum
 from ..LLMInterface import LLMInterface
@@ -20,8 +22,11 @@ class CohereClient(LLMInterface):
         default_temperature: float = 0.1,
     ):
         if not api_key:
-            logger.error("A Cohere API key must be provided.")
-            raise ValueError("A Cohere API key must be provided.")
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.API_KEY_MISSING,
+                status_code=500,
+                dev_detail="Cohere API key missing during CohereClient initialization.",
+            )
 
         # Initialize the async Cohere client
         self.client = cohere.AsyncClientV2(api_key=api_key)
@@ -32,7 +37,6 @@ class CohereClient(LLMInterface):
         self.DEFAULT_DIMENSIONS = CohereEnum.DEFAULT_DIMENSIONS.value
 
         # Store your excellent RAG defaults
-
         self.default_max_input_characters = default_max_input_characters
         self.default_max_tokens = default_max_output_tokens
         self.default_temperature = default_temperature
@@ -87,14 +91,23 @@ class CohereClient(LLMInterface):
             content = response.message.content[0].text
 
             if not content or not isinstance(content, str) or not content.strip():
-                logger.error(f"Cohere returned an empty response for model '{self.generation_model_id}'")
-                raise ValueError("Received empty text response from LLM.")
+                raise CustomAPIException(
+                    signal_enum=ResponseSignal.NLP_CHAT_FAILED,
+                    status_code=502,
+                    dev_detail=f"Cohere returned an empty response for generation model '{self.generation_model_id}'.",
+                )
 
             return content.strip()
 
-        except Exception:
-            logger.exception(f"Cohere text generation failed using model '{self.generation_model_id}'")
+        except CustomAPIException:
+            # Re-raise custom exceptions from validation so we don't wrap them twice
             raise
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.NLP_CHAT_FAILED,
+                status_code=502,
+                dev_detail=f"Cohere chat generation crashed using model '{self.generation_model_id}'.",
+            ) from e
 
     @validate_llm_client
     async def generate_text_stream(
@@ -125,9 +138,12 @@ class CohereClient(LLMInterface):
                     if event.delta and event.delta.message and event.delta.message.content:
                         yield {"type": "answer", "text": event.delta.message.content.text}
 
-        except Exception:
-            logger.exception(f"Cohere text stream generation failed using model '{self.generation_model_id}'")
-            raise
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.NLP_CHAT_FAILED,
+                status_code=502,
+                dev_detail=f"Cohere streaming generation crashed using model '{self.generation_model_id}'.",
+            ) from e
 
     @validate_llm_client
     async def generate_embedding(
@@ -149,17 +165,29 @@ class CohereClient(LLMInterface):
 
             # --- OUTPUT VALIDATION ---
             if not response.embeddings.float or not isinstance(response.embeddings.float, list):
-                logger.error("Cohere returned an invalid embedding format.")
-                raise ValueError("Received invalid embedding format from LLM.")
+                raise CustomAPIException(
+                    signal_enum=ResponseSignal.EMBEDDING_FAILED,
+                    status_code=502,
+                    dev_detail="Cohere returned an invalid embedding format.",
+                )
 
             embedding = response.embeddings.float
 
             if self.embedding_size and len(embedding[0]) != self.embedding_size:
-                logger.error(f"Dimensionality mismatch! Expected {self.embedding_size}, got {len(embedding[0])}.")
-                raise ValueError(f"Embedding dimension mismatch. Expected {self.embedding_size}.")
+                raise CustomAPIException(
+                    signal_enum=ResponseSignal.EMBEDDING_FAILED,
+                    status_code=502,
+                    dev_detail=f"Dimensionality mismatch! Expected {self.embedding_size}, got {len(embedding[0])}.",
+                )
 
             return embedding
 
-        except Exception:
-            logger.exception(f"Cohere embedding generation failed using model '{self.embedding_model_id}'")
+        except CustomAPIException:
+            # Re-raise custom exceptions from validation so we don't wrap them twice
             raise
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.EMBEDDING_FAILED,
+                status_code=502,
+                dev_detail=f"Cohere embedding generation crashed using model '{self.embedding_model_id}'.",
+            ) from e

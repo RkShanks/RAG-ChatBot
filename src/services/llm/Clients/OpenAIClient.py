@@ -4,6 +4,8 @@ from typing import Dict, List
 from openai import AsyncOpenAI
 
 from helpers.decorators import validate_llm_client
+from helpers.exceptions import CustomAPIException
+from helpers.ResponseEnums import ResponseSignal
 
 from ..LLMEnums import OPENAIEnum
 from ..LLMInterface import LLMInterface
@@ -24,8 +26,11 @@ class OpenAIClient(LLMInterface):
         Initialize the async OpenAI client with system-wide defaults.
         """
         if not api_key and not base_url:
-            logger.error("An OPENAI_API key or a local base_url must be provided.")
-            raise ValueError("An API key or a local base_url must be provided.")
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.API_KEY_MISSING,
+                status_code=500,
+                dev_detail="An OPENAI_API key or a local base_url must be provided during initialization.",
+            )
 
         # If base_url is provided, it will point to your local open-source server!
         self.client = AsyncOpenAI(api_key=api_key, base_url=base_url)
@@ -98,15 +103,24 @@ class OpenAIClient(LLMInterface):
 
             # 6. Verify it is a valid string and not empty
             if not content or not isinstance(content, str) or not content.strip():
-                logger.error(f"OpenAI returned an empty or invalid response for model '{self.generation_model_id}'")
-                raise ValueError("Received empty text response from LLM.")
+                raise CustomAPIException(
+                    signal_enum=ResponseSignal.NLP_CHAT_FAILED,
+                    status_code=502,
+                    dev_detail=f"OpenAI returned an empty or invalid response for model '{self.generation_model_id}'.",
+                )
 
             # Return the clean guaranteed string
             return content.strip()
 
-        except Exception:
-            logger.exception(f"OpenAI text generation failed using model '{self.generation_model_id}'")
+        except CustomAPIException:
+            # The Pass-Through: Prevents double-wrapping our validation errors
             raise
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.NLP_CHAT_FAILED,
+                status_code=502,
+                dev_detail=f"OpenAI text generation crashed using model '{self.generation_model_id}'.",
+            ) from e
 
     @validate_llm_client
     async def generate_text_stream(
@@ -152,8 +166,12 @@ class OpenAIClient(LLMInterface):
                     yield {"type": "answer", "text": content}
 
         except Exception as e:
-            logger.exception("Stream failed internally.")
-            yield f"\n\n[INTERNAL STREAM ERROR]: {str(e)}"
+            # the exception so FastAPI/SSE handlers can close the connection cleanly with a 502.
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.NLP_CHAT_FAILED,
+                status_code=502,
+                dev_detail=f"OpenAI text stream generation crashed using model '{self.generation_model_id}'.",
+            ) from e
 
     @validate_llm_client
     async def generate_embedding(self, texts: list[str], input_type: str = None, **kwargs) -> list[List[float]]:
@@ -175,22 +193,31 @@ class OpenAIClient(LLMInterface):
 
             # 2. Verify it is actually a list
             if not embeddings or not isinstance(embeddings, list):
-                logger.error("OpenAI returned an invalid embedding format.")
-                raise ValueError("Received invalid embedding format from LLM.")
+                raise CustomAPIException(
+                    signal_enum=ResponseSignal.EMBEDDING_FAILED,
+                    status_code=502,
+                    dev_detail="OpenAI returned an invalid embedding format.",
+                )
 
             # 3. Verify the dimensions match your database requirements exactly!
             if self.embedding_size and len(embeddings[0]) != self.embedding_size:
-                logger.error(f"Dimensionality mismatch! Expected {self.embedding_size}, got {len(embeddings[0])}.")
-                raise ValueError(f"Embedding dimension mismatch. Expected {self.embedding_size}.")
+                raise CustomAPIException(
+                    signal_enum=ResponseSignal.EMBEDDING_FAILED,
+                    status_code=502,
+                    dev_detail=f"Dimensionality mismatch! Expected {self.embedding_size}, got {len(embeddings[0])}.",
+                )
 
             # 4. Return the guaranteed, perfectly sized vector
             return embeddings
 
-        except Exception:
-            logger.exception(
-                f"OpenAI embedding generation failed using model '{self.embedding_model_id}' and size '{self.embedding_size}'"
-            )
+        except CustomAPIException:
             raise
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.EMBEDDING_FAILED,
+                status_code=502,
+                dev_detail=f"OpenAI embedding generation crashed using model '{self.embedding_model_id}' and size '{self.embedding_size}'.",
+            ) from e
 
     async def construct_prompt(self, prompt: str, role: str) -> dict:
         return {
