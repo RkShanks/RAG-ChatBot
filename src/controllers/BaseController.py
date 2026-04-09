@@ -3,6 +3,8 @@ import random
 import string
 
 from helpers.config import get_settings
+from helpers.exceptions import CustomAPIException
+from helpers.ResponseEnums import ResponseSignal
 
 
 class BaseController:
@@ -32,7 +34,15 @@ class BaseController:
         )
 
         if not os.path.exists(database_path):
-            os.makedirs(database_path)
+            try:
+                os.makedirs(database_path)
+            except Exception as e:
+                raise CustomAPIException(
+                    signal_enum=ResponseSignal.INTERNAL_SERVER_ERROR,
+                    status_code=500,
+                    dev_detail=f"OS failed to create local database directory at path: {database_path}.",
+                ) from e
+
         return database_path
 
     def get_collection_name(self, project_id: str) -> str:
