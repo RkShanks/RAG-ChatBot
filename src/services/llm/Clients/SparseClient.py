@@ -5,6 +5,9 @@ from typing import Dict, List
 
 from fastembed import SparseTextEmbedding
 
+from helpers.exceptions import CustomAPIException
+from helpers.ResponseEnums import ResponseSignal
+
 logger = logging.getLogger(__name__)
 
 
@@ -18,12 +21,19 @@ class SparseClient:
         # 2. Build the final path: src/assets/local_models
         cache_dir = src_dir / "assets" / "local_models"
 
-        # 3. Create the folder if it doesn't exist yet
-        cache_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            # 3. Create the folder if it doesn't exist yet
+            cache_dir.mkdir(parents=True, exist_ok=True)
 
-        # 4. Pass the string version of the path to fastembed and downloads the small model to your local machine
-        self.model = SparseTextEmbedding(model_name=model_name, cache_dir=str(cache_dir))
-        logger.info("Sparse Model loaded successfully.")
+            # 4. Pass the string version of the path to fastembed and downloads the small model to your local machine
+            self.model = SparseTextEmbedding(model_name=model_name, cache_dir=str(cache_dir))
+            logger.info("Sparse Model loaded successfully.")
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.MODEL_LOADING_FAILED,
+                status_code=500,
+                dev_detail=f"Failed to load local sparse model '{model_name}' into {cache_dir}.",
+            ) from e
 
     async def generate_sparse_embedding(self, text: str) -> Dict[str, List]:
         """
@@ -36,6 +46,10 @@ class SparseClient:
 
             # Extract the indices and values required by Qdrant/MongoDB
             return {"indices": result.indices.tolist(), "values": result.values.tolist()}
-        except Exception:
-            logger.exception("Failed to generate sparse embedding.")
-            raise
+
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.EMBEDDING_FAILED,
+                status_code=500,  # 500 because it crashed locally, not a 502 upstream error
+                dev_detail="Local Sparse model failed to execute mathematical embedding in background thread.",
+            ) from e
