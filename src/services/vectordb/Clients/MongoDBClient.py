@@ -4,6 +4,8 @@ from typing import Any, Dict, List, Optional
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo.operations import SearchIndexModel
 
+from helpers.exceptions import CustomAPIException
+from helpers.ResponseEnums import ResponseSignal
 from models.db_schemes import DocumentChunk
 
 from ..VectorDBEnums import DistanceMetricEnum
@@ -31,9 +33,13 @@ class MongoDBClient(VectorDBInterface):
             self.client = AsyncIOMotorClient(self.uri)
             self.db = self.client[self.db_name]
             logger.info(f"Successfully connected to MongoDB Atlas: Database '{self.db_name}'")
-        except Exception:
-            logger.exception("Failed to connect to MongoDB Atlas")
-            raise
+
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.DB_CONNECTION_FAILED,
+                status_code=503,
+                dev_detail=f"Failed to connect to MongoDB Atlas at URI: {self.uri}",
+            ) from e
 
     async def disconnect(self) -> None:
         try:
@@ -42,26 +48,38 @@ class MongoDBClient(VectorDBInterface):
                 self.client = None
                 self.db = None
                 logger.info("Successfully disconnected from MongoDB Atlas")
-        except Exception:
-            logger.exception("Failed to disconnect from MongoDB Atlas")
-            raise
+
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.INTERNAL_SERVER_ERROR,
+                status_code=500,
+                dev_detail="Failed to gracefully disconnect from MongoDB Atlas.",
+            ) from e
 
     async def is_collection_exist(self, collection_name: str) -> bool:
         try:
             collections = await self.db.list_collection_names()
             return collection_name in collections
-        except Exception:
-            logger.exception(f"Failed to check if collection '{collection_name}' exists")
-            raise
+
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.DB_CONNECTION_FAILED,
+                status_code=503,
+                dev_detail=f"Failed to fetch collection names to check if '{collection_name}' exists.",
+            ) from e
 
     async def list_all_collections(self) -> List[str]:
         try:
             response = await self.db.list_collection_names()
             logger.info("Successfully listed all collections")
             return response
-        except Exception:
-            logger.exception("Failed to list all collections")
-            raise
+
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.COLLECTION_INFO_FAILED,
+                status_code=503,
+                dev_detail="Failed to list all collections in MongoDB.",
+            ) from e
 
     async def get_collection_info(self, collection_name: str) -> Dict:
         try:
@@ -69,9 +87,13 @@ class MongoDBClient(VectorDBInterface):
             count = await collection.count_documents({})
             logger.info(f"Successfully retrieved info for collection '{collection_name}'")
             return {"collection_name": collection_name, "document_count": count}
-        except Exception:
-            logger.exception(f"Failed to retrieve collection info for '{collection_name}'")
-            raise
+
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.COLLECTION_INFO_FAILED,
+                status_code=500,
+                dev_detail=f"Failed to retrieve collection info for '{collection_name}'.",
+            ) from e
 
     async def delete_collection(self, collection_name: str) -> bool:
         try:
@@ -81,9 +103,13 @@ class MongoDBClient(VectorDBInterface):
                 return True
             logger.info(f"Collection: {collection_name} does not exist")
             return False
-        except Exception:
-            logger.exception(f"Failed to delete collection: {collection_name}")
-            raise
+
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.COLLECTION_DELETION_FAILED,
+                status_code=500,
+                dev_detail=f"Failed to delete MongoDB collection: {collection_name}",
+            ) from e
 
     async def create_collection(
         self,
@@ -124,9 +150,13 @@ class MongoDBClient(VectorDBInterface):
             await self.db[collection_name].create_search_index(model=search_index_model)
             logger.info(f"Created collection '{collection_name}' and Vector Index '{index_name}'.")
             return True
-        except Exception:
-            logger.exception(f"Failed to create collection or vector index: {collection_name}")
-            raise
+
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.COLLECTION_CREATION_FAILED,
+                status_code=500,
+                dev_detail=f"Failed to create collection or vector index for '{collection_name}'.",
+            ) from e
 
     async def insert_one(self, collection_name: str, document: DocumentChunk) -> bool:
         return await self.insert_many(collection_name, [document])
@@ -147,12 +177,16 @@ class MongoDBClient(VectorDBInterface):
             batch = mongo_docs[i : i + batch_size]
             try:
                 await collection.insert_many(batch)
-            except Exception:
+
+            except Exception as e:
                 failed_inserts += len(batch)
-                logger.exception(f"Failed to insert batch number {i // batch_size} into {collection_name}.")
+                # Replaced logger.exception with logger.error to avoid spamming stack traces
+                logger.error(f"Failed to insert batch {i // batch_size} into {collection_name}. Error: {str(e)}")
                 continue
 
-        logger.info(f"Inserted {len(documents)} chunks into {collection_name} with failed inserts: {failed_inserts}")
+        logger.info(
+            f"Inserted {len(documents) - failed_inserts} chunks into {collection_name}. Failed: {failed_inserts}"
+        )
         return True
 
     def documents_to_mongo_docs(self, documents: List[DocumentChunk]) -> List[Dict[str, Any]]:
@@ -229,6 +263,9 @@ class MongoDBClient(VectorDBInterface):
 
             return results
 
-        except Exception:
-            logger.exception(f"Failed to perform search for collection: {collection_name}")
-            raise
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.NLP_SEARCH_FAILED,
+                status_code=503,
+                dev_detail=f"Vector aggregation pipeline failed on collection '{collection_name}'.",
+            ) from e
