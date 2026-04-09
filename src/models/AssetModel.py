@@ -5,6 +5,9 @@ from typing import List
 
 from bson import ObjectId
 
+from helpers.exceptions import CustomAPIException
+from helpers.ResponseEnums import ResponseSignal
+
 from .BaseDataModel import BaseDataModel
 from .db_schemes import Asset
 from .enums import AssetTypeEnum, DataBaseEnum
@@ -28,9 +31,12 @@ class AssetModel(BaseDataModel):
             logger.info(f"Asset created with name: {asset.asset_name} (MongoDB ID: {result.inserted_id})")
             asset.id = result.inserted_id
 
-        except Exception:
-            logger.exception(f"Error creating asset with name: {asset.asset_name}")
-            raise
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.ASSET_CREATION_FAILED,
+                status_code=500,
+                dev_detail=f"MongoDB failed to insert asset '{asset.asset_name}'.",
+            ) from e
 
         return asset
 
@@ -45,15 +51,16 @@ class AssetModel(BaseDataModel):
                 },
             )
             raw_assets = await cursor.to_list(length=None)
-            assets = [
-                Asset.model_validate(doc)
-                for doc in raw_assets  #
-            ]
+            assets = [Asset.model_validate(doc) for doc in raw_assets]
             logger.info(f"Retrieved {len(assets)} assets for project_id: {asset_project_id}")
             return assets
-        except Exception:
-            logger.exception(f"Error retrieving assets for project_id: {asset_project_id}")
-            raise
+
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.ASSET_RETRIEVAL_FAILED,
+                status_code=500,
+                dev_detail=f"Failed to retrieve assets of type '{asset_type}' for project '{asset_project_id}'.",
+            ) from e
 
     async def create_from_file(self, project_id: str, file_id: str, file_path: str):
         logger.debug(
@@ -64,9 +71,13 @@ class AssetModel(BaseDataModel):
         try:
             file_size_bytes = await asyncio.to_thread(os.path.getsize, file_path)
             file_size_kb = file_size_bytes / 1024
-        except Exception:
-            logger.exception(f"Disk IO failure calculating size for '{file_path}'")
-            raise
+
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.FILE_NOT_FOUND,
+                status_code=404,
+                dev_detail=f"Disk IO failure calculating size for '{file_path}'.",
+            ) from e
 
         # 2. Build the strict Pydantic model internally
         asset_resource = Asset(
@@ -82,9 +93,17 @@ class AssetModel(BaseDataModel):
             result = await self.create_asset(asset=asset_resource)
             logger.info(f"Asset record created effectively for file '{file_id}' ({file_size_kb:.2f} KB)")
             return result
-        except Exception:
-            logger.exception(f"Database insertion failed during asset creation for '{file_id}'")
+
+        except CustomAPIException:
+            # The Pass-Through: Prevent double-wrapping if create_asset fails!
             raise
+
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.ASSET_CREATION_FAILED,
+                status_code=500,
+                dev_detail=f"Database insertion failed during asset creation for '{file_id}'",
+            ) from e
 
     async def get_asset_record(self, asset_project_id: str, asset_name: str) -> Asset:
         logger.debug(f"Retrieving asset record for project_id: {asset_project_id} and asset_name: {asset_name}")
@@ -103,6 +122,10 @@ class AssetModel(BaseDataModel):
             asset = Asset.model_validate(doc)
             logger.info(f"Asset record retrieved for asset_name: {asset_name} in project_id: {asset_project_id}")
             return asset
-        except Exception:
-            logger.exception(f"Error retrieving asset for project_id: {asset_project_id} and asset_name: {asset_name}")
-            raise
+
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.ASSET_RETRIEVAL_FAILED,
+                status_code=500,
+                dev_detail=f"MongoDB query crashed while fetching '{asset_name}' for project '{asset_project_id}'.",
+            ) from e
