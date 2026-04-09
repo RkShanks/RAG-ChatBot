@@ -2,6 +2,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from controllers.BaseController import BaseController
+from helpers.exceptions import CustomAPIException
 from models.db_schemes import RetrievedDocument
 from services.llm import InputTypeEnum, LLMInterface
 from services.vectordb import VectorDBInterface
@@ -52,18 +53,25 @@ CONSTRAINTS:
         """
         collection_name = self.get_collection_name(project_id)
 
+        # 1. Primary Embedding
         logger.debug(f"Generating query embeddings for search in '{collection_name}'...")
-        try:
-            dense_query_vector = await self.embedding_client.generate_embedding(
-                texts=[query],
-                input_type=InputTypeEnum.Query.value,
-            )
-        except Exception:
-            return
+        dense_query_vector = await self.embedding_client.generate_embedding(
+            texts=[query],
+            input_type=InputTypeEnum.Query.value,
+        )
+
+        # 2. Sparse Embedding
         sparse_query_vector = None
         if self.vector_client.is_sparse_needed() and self.sparse_client:
-            sparse_query_vector = await self.sparse_client.generate_sparse_embedding(query)
+            try:
+                sparse_query_vector = await self.sparse_client.generate_sparse_embedding(query)
+            except CustomAPIException as e:
+                # We catch the custom exception, log it, but DO NOT raise it.
+                # We fail safe and proceed with a Dense-Only search.
+                logger.warning(f"Sparse embedding failed. Falling back to dense-only search. Reason: {e.dev_detail}")
+                sparse_query_vector = None
 
+        # 3. Vector DB Search
         logger.debug(f"Executing broad vector search with retrieval_limit={retrieval_limit}...")
         initial_results = await self.vector_client.search_by_vector(
             collection_name=collection_name,
@@ -74,15 +82,22 @@ CONSTRAINTS:
         )
         format_results = self.format_search_results(initial_results)
 
-        # The Cross-Encoder Reranking
+        # 4. Cross-Encoder Reranking
         if self.reranker_client and format_results:
             logger.debug(f"Reranking top {retrieval_limit} chunks to find the absolute best {final_limit}...")
-            reranked_results = await self.reranker_client.rerank(
-                query=query, documents=format_results, top_k=final_limit
-            )
-            return reranked_results
+            try:
+                reranked_results = await self.reranker_client.rerank(
+                    query=query, documents=format_results, top_k=final_limit
+                )
+                return reranked_results
 
-        # Fallback if no reranker is configured
+            except CustomAPIException as e:
+                # We catch the custom exception, log it, but DO NOT raise it.
+                # We fail safe and just return the un-reranked Qdrant results!
+                logger.warning(f"Reranking failed. Falling back to raw Qdrant scores. Reason: {e.dev_detail}")
+                return format_results[:final_limit]
+
+        # Fallback if no reranker is configured (or if it failed)
         return format_results[:final_limit]
 
     def format_search_results(self, search_results: List[Dict[str, Any]]) -> List[RetrievedDocument]:

@@ -5,7 +5,9 @@ import re
 import aiofiles
 from fastapi import UploadFile
 
-from models import ProcessingEnums, ResponseSignal
+from helpers.exceptions import CustomAPIException
+from helpers.ResponseEnums import ResponseSignal
+from models import ProcessingEnums
 
 from .BaseController import BaseController
 from .ProjectController import ProjectController
@@ -23,15 +25,21 @@ class DataController(BaseController):
 
         # Implement file validation logic based on self.app_settings.FILE_EXTENSIONS and self.app_settings.FILE_SIZE_LIMIT
         if file.content_type not in self.app_settings.FILE_EXTENSIONS:
-            logger.warning(f"File type '{file.content_type}' not supported for file: {file.filename}")
-            return False, ResponseSignal.FILE_TYPE_NOT_SUPPORTED.value
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.FILE_TYPE_NOT_SUPPORTED,
+                status_code=415,  # 415 Unsupported Media Type
+                dev_detail=f"Rejected '{file.filename}'. MIME type '{file.content_type}' is not allowed.",
+            )
 
         if file.size > self.app_settings.FILE_MAX_SIZE * self.file_scalar:
-            logger.warning(f"File size {file.size} exceeds limit for file: {file.filename}")
-            return False, ResponseSignal.FILE_SIZE_EXCEEDED.value
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.FILE_SIZE_EXCEEDED,
+                status_code=413,  # 413 Payload Too Large
+                dev_detail=f"Rejected '{file.filename}'. Size {file.size} exceeds the {self.app_settings.FILE_MAX_SIZE}MB limit.",
+            )
 
         logger.info(f"File '{file.filename}' passed validation checks.")
-        return True, ResponseSignal.FILE_VALIDATION_SUCCESS.value
+        return True
 
     def generate_unique_file_path(self, file_name: str, project_id: str):
         logger.debug(f"Generating unique file path for file: '{file_name}' in project: '{project_id}'")
@@ -82,5 +90,8 @@ class DataController(BaseController):
             return True
 
         except Exception as e:
-            logger.exception(f"Disk IO Error while saving '{file.filename}'")
-            raise e
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.FILE_UPLOADED_FAILED,
+                status_code=500,
+                dev_detail=f"Disk IO Error while saving '{file.filename}' to path: '{file_path}'",
+            ) from e
