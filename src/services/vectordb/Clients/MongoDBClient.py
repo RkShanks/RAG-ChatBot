@@ -27,7 +27,7 @@ class MongoDBClient(VectorDBInterface):
         }
 
     async def connect(self) -> None:
-        if self.db:
+        if self.db is not None:
             return
         try:
             self.client = AsyncIOMotorClient(self.uri)
