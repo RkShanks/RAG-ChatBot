@@ -36,8 +36,6 @@ export function ChatBox({ activeProjectId }: { activeProjectId: string }) {
     setInputTitle("");
     setIsTyping(true);
     
-    // Add empty system message to hold incoming streamed chunks
-    setMessages(prev => [...prev, { role: "system", text: "" }]);
     
     setTimeout(scrollToBottom, 100);
 
@@ -82,11 +80,18 @@ export function ChatBox({ activeProjectId }: { activeProjectId: string }) {
                 setIsTyping(false); // Hide the 3 bouncing dots as soon as real text starts rendering
                 setMessages(prev => {
                   const newArr = [...prev];
-                  const lastIndex = newArr.length - 1;
-                  newArr[lastIndex] = {
-                    ...newArr[lastIndex],
-                    text: newArr[lastIndex].text + (data.text || "")
-                  };
+                  const lastMsg = newArr[newArr.length - 1];
+                  
+                  if (lastMsg.role === "user") {
+                    // Inject newly spawned System bubble natively with first chunk
+                    newArr.push({ role: "system", text: data.text || "" });
+                  } else {
+                    const lastIndex = newArr.length - 1;
+                    newArr[lastIndex] = {
+                      ...newArr[lastIndex],
+                      text: newArr[lastIndex].text + (data.text || "")
+                    };
+                  }
                   return newArr;
                 });
                 scrollToBottom();
@@ -139,7 +144,7 @@ export function ChatBox({ activeProjectId }: { activeProjectId: string }) {
                 `}>
                   <div className={`prose prose-invert max-w-none text-[15px] font-light leading-relaxed prose-p:leading-relaxed prose-pre:bg-black/60 prose-pre:border prose-pre:border-white/10 prose-pre:shadow-2xl prose-code:text-indigo-300`}>
                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {msg.text || "..."}
+                        {msg.text}
                      </ReactMarkdown>
                   </div>
                 </div>
