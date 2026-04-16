@@ -44,6 +44,8 @@ class ResponseSignal(Enum):
     COLLECTION_DELETION_FAILED = ("collection_deletion_failed", "Failed to delete the database collection.")
     PROJECT_CREATION_FAILED = ("project_creation_failed", "Failed to create or initialize the project space.")
     PROJECT_RETRIEVAL_FAILED = ("project_retrieval_failed", "Failed to retrieve the requested project data.")
+    PROJECT_NOT_FOUND = ("project_not_found", "The requested project could not be found or you lack permission.")
+    PROJECT_DELETED_SUCCESSFULLY = ("project_deleted_successfully", "Project and all associated data correctly purged.")
 
     # --- Chunking & Ingestion ---
     CHUNKING_SUCCESS = ("chunking_success", "Document successfully divided into manageable chunks.")

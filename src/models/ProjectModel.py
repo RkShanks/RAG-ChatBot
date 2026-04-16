@@ -61,6 +61,32 @@ class ProjectModel(BaseDataModel):
                 dev_detail=f"MongoDB failed to retrieve or upsert project '{project_id}'.",
             ) from e
 
+    async def get_project(self, project_id: str, session_id: str) -> Project:
+        logger.debug(f"Retrieving project with ID: {project_id} for Session: {session_id}")
+        try:
+            doc = await self.collection.find_one({"project_id": project_id, "session_id": session_id})
+            if doc is None:
+                return None
+            return Project.model_validate(doc)
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.PROJECT_RETRIEVAL_FAILED,
+                status_code=500,
+                dev_detail=f"MongoDB failed to retrieve project '{project_id}'.",
+            ) from e
+
+    async def delete_project(self, project_id: str, session_id: str) -> bool:
+        logger.debug(f"Deleting project with ID: {project_id} for Session: {session_id}")
+        try:
+            result = await self.collection.delete_one({"project_id": project_id, "session_id": session_id})
+            return result.deleted_count > 0
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.INTERNAL_SERVER_ERROR,
+                status_code=500,
+                dev_detail=f"MongoDB failed to delete project '{project_id}'.",
+            ) from e
+
     async def get_all_projects(self, page: int, page_size: int, session_id: str) -> Tuple[List[Project], int]:
         logger.debug(f"Retrieving all projects with pagination - Page: {page}, Page Size: {page_size} for Session: {session_id}")
 

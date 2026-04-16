@@ -3,10 +3,10 @@ import logging
 from fastapi import APIRouter, Depends, Request, UploadFile
 from fastapi.responses import JSONResponse
 
-from controllers import DataController, ProcessController
+from controllers import BaseController, DataController, ProcessController, ProjectController
 from helpers.config import Settings, get_settings
 from helpers.dependencies import get_session_id
-from models import AssetModel, ProjectModel, ResponseSignal
+from models import AssetModel, ChunkModel, ProjectModel, ResponseSignal
 from routes.schemes.data import ProcessRequest
 
 logger = logging.getLogger(__name__)
@@ -114,4 +114,50 @@ async def get_collection_info(
     return JSONResponse(
         status_code=result["status"],
         content=result["content"],
+    )
+
+@data_router.delete("/project/{project_id}")
+async def delete_project(
+    request: Request,
+    project_id: str,
+    session_id: str = Depends(get_session_id),
+):
+    logger.debug(f"Received delete request for project '{project_id}'")
+
+    project_model = ProjectModel(db_client=request.app.state.db_client)
+
+    # 1. Verify Ownership & Retrieve Project
+    project = await project_model.get_project(project_id=project_id, session_id=session_id)
+    if not project:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"signal": ResponseSignal.PROJECT_NOT_FOUND.value}
+        )
+
+    # 2. Delete Qdrant Vector Collection Physically
+    base_controller = BaseController()
+    collection_name = base_controller.get_collection_name(project_id, session_id)
+    chunk_model = ChunkModel(vector_db_client=request.app.state.vector_db_client)
+    # The VectorDB might throw CustomAPIException if collection doesn't exist, we can ignore or let global handler catch.
+    # Usually it's fine to pass through.
+    try:
+        await chunk_model.delete_chunks_by_collection_name(collection_name)
+    except Exception as e:
+        logger.warning(f"Vector DB collection might not exist, skipping... Detail: {e}")
+
+    # 3. Delete MongoDB Assets
+    asset_model = AssetModel(db_client=request.app.state.db_client)
+    await asset_model.delete_project_assets(asset_project_id=str(project.id))
+
+    # 4. Delete MongoDB Project Config
+    await project_model.delete_project(project_id=project_id, session_id=session_id)
+
+    # 5. Physically eradicate the disk directory
+    project_controller = ProjectController()
+    project_controller.delete_project_path(project_id=project_id)
+
+    logger.info(f"Successfully eradicated project '{project_id}' and all associated physical data.")
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={"signal": ResponseSignal.PROJECT_DELETED_SUCCESSFULLY.value}
     )
