@@ -1,59 +1,24 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Folder, FileText, Settings, Database, Trash2, PlusCircle, UploadCloud, Loader2 } from "lucide-react";
-import { apiClient } from "../lib/api";
-import { useErrorToast } from "../lib/ToastContext";
 
-export function Sidebar({ activeProjectId }: { activeProjectId: string }) {
-  const [isUploading, setIsUploading] = useState(false);
-  const [files, setFiles] = useState<{id: string, name: string}[]>([]);
+export function Sidebar({ 
+  activeProjectId, 
+  files, 
+  isUploading, 
+  onFileUpload, 
+  onDeleteFile 
+}: { 
+  activeProjectId: string,
+  files: {id: string, name: string}[],
+  isUploading: boolean,
+  onFileUpload: (f: File) => void,
+  onDeleteFile: (id: string) => void
+}) {
+
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const { triggerToast } = useErrorToast();
-
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setIsUploading(true);
-    const formData = new FormData();
-    formData.append("file", file);
-
-    try {
-      // 1. Upload to FastAPI
-      const uploadRes = await apiClient.post(`/data/upload/${activeProjectId}`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      const newFileId = uploadRes.data.file_id;
-
-      // 2. Trigger Heavy NLP Ingestion Processing
-      await apiClient.post(`/data/process/${activeProjectId}`, { 
-        file_id: newFileId, 
-        do_reset: false 
-      });
-
-      // 3. Update React State to reflect new Data Lake asset
-      setFiles(prev => [...prev, { id: newFileId, name: file.name }]);
-
-    } catch (error: any) {
-      triggerToast(error.response?.data?.dev_detail || "Vector upload pipeline crushed.");
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
-
-  const handleDeleteFile = async (fileId: string) => {
-    try {
-      // Fires our Custom Backend Pipeline!!
-      await apiClient.delete(`/data/project/${activeProjectId}/file/${fileId}`);
-      setFiles(prev => prev.filter(f => f.id !== fileId));
-    } catch (e: any) {
-      triggerToast(e.response?.data?.dev_detail || "Eradication sequence failed!");
-    }
-  };
 
   return (
     <motion.aside 
@@ -106,7 +71,7 @@ export function Sidebar({ activeProjectId }: { activeProjectId: string }) {
                     <FileText size={14} className="text-emerald-400 shrink-0" />
                     <span className="text-xs text-white/70 group-hover:text-white transition-colors truncate">{file.name}</span>
                   </div>
-                  <motion.button onClick={() => handleDeleteFile(file.id)} whileHover={{ scale: 1.1 }} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 rounded-md transition-all">
+                  <motion.button onClick={() => onDeleteFile(file.id)} whileHover={{ scale: 1.1 }} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 rounded-md transition-all">
                     <Trash2 size={12} className="text-red-400" />
                   </motion.button>
                 </motion.div>
@@ -117,7 +82,12 @@ export function Sidebar({ activeProjectId }: { activeProjectId: string }) {
             <input 
               type="file" 
               ref={fileInputRef}
-              onChange={handleFileUpload} 
+              onChange={(e) => {
+                 if (e.target.files?.[0]) {
+                    onFileUpload(e.target.files[0]);
+                    e.target.value = ''; // Reset input cleanly
+                 }
+              }} 
               className="hidden" 
               accept=".txt,.pdf,.docx"
             />
