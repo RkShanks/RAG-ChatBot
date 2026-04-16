@@ -30,7 +30,7 @@ export function ChatBox({ activeProjectId }: { activeProjectId: string }) {
         const res = await apiClient.get(`/nlp/history/${activeProjectId}`);
         if (res.data && res.data.history && res.data.history.length > 0) {
            const dbMessages = res.data.history.map((h: any) => ({
-              role: h.role,
+              role: h.role === "assistant" ? "system" : h.role,
               text: h.content
            }));
            
