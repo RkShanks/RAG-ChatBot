@@ -5,7 +5,7 @@ import { Sidebar } from "./components/Sidebar";
 import { ChatBox } from "./components/ChatBox";
 
 export default function Home() {
-  const [activeProjectId, setActiveProjectId] = useState("default-workspace");
+  const [activeProjectId, setActiveProjectId] = useState("defaultworkspace");
 
   return (
     <main className="flex h-screen w-screen overflow-hidden bg-[var(--background)] relative">
