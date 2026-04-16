@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { ChatBox } from "./components/ChatBox";
 import { apiClient } from "./lib/api";
@@ -8,30 +8,109 @@ import { useErrorToast } from "./lib/ToastContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { UploadCloud } from "lucide-react";
 
+type ProjectInfo = { id: string; name: string };
+
 export default function Home() {
-  const [activeProjectId, setActiveProjectId] = useState("defaultworkspace");
+  const [projects, setProjects] = useState<ProjectInfo[]>([]);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [files, setFiles] = useState<{id: string, name: string}[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const { triggerToast } = useErrorToast();
 
+  // ─── Fetch all workspaces from the database ───
+  const refreshProjects = useCallback(async () => {
+    try {
+      const res = await apiClient.get("/data/projects");
+      if (res.data?.projects) {
+        const mapped: ProjectInfo[] = res.data.projects.map((p: any) => ({
+          id: p.project_id,
+          name: p.project_name || p.project_id,
+        }));
+        setProjects(mapped);
+        return mapped;
+      }
+    } catch (err: any) {
+      console.warn("Could not fetch projects.", err);
+    }
+    return [];
+  }, []);
+
+  // ─── Initial hydration ───
   useEffect(() => {
+    const hydrate = async () => {
+      const fetched = await refreshProjects();
+      if (fetched.length > 0 && !activeProjectId) {
+        setActiveProjectId(fetched[0].id);
+      }
+    };
+    hydrate();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ─── Fetch files whenever the active project changes ───
+  useEffect(() => {
+    if (!activeProjectId) return;
     const fetchExistingFiles = async () => {
       try {
         const res = await apiClient.get(`/data/files/${activeProjectId}`);
-        if (res.data && res.data.files) {
+        if (res.data?.files) {
           setFiles(res.data.files);
+        } else {
+          setFiles([]);
         }
       } catch (err: any) {
         if (err.response?.status !== 404) {
           console.warn("Could not fetch existing workspace files.");
         }
+        setFiles([]);
       }
     };
     fetchExistingFiles();
   }, [activeProjectId]);
 
+  // ─── Create a new workspace ───
+  const handleNewProject = () => {
+    // Generate a clean alphanumeric ID
+    const newId = "workspace" + Date.now().toString(36);
+    setActiveProjectId(newId);
+    setFiles([]);
+    // The project will be physically created in MongoDB on first file upload
+  };
+
+  // ─── Switch workspace ───
+  const handleSwitchProject = (projectId: string) => {
+    if (projectId === activeProjectId) return;
+    setActiveProjectId(projectId);
+    // files + chat history will auto-refresh via useEffect dependencies
+  };
+
+  // ─── Delete an entire workspace ───
+  const handleDeleteProject = async (projectId: string) => {
+    const confirmed = window.confirm(
+      "⚠️ This will permanently destroy all files, vector embeddings, and chat history for this workspace. Are you sure?"
+    );
+    if (!confirmed) return;
+
+    try {
+      await apiClient.delete(`/data/project/${projectId}`);
+      const updated = await refreshProjects();
+
+      if (projectId === activeProjectId) {
+        // Switch to the next available project or create a fresh one
+        if (updated.length > 0) {
+          setActiveProjectId(updated[0].id);
+        } else {
+          handleNewProject();
+        }
+      }
+    } catch (e: any) {
+      triggerToast(e.response?.data?.dev_detail || "Failed to delete workspace.");
+    }
+  };
+
+  // ─── File Upload (with auto-naming refresh) ───
   const handleFileUpload = async (file: File) => {
+    if (!activeProjectId) return;
     setIsUploading(true);
     const formData = new FormData();
     formData.append("file", file);
@@ -48,6 +127,9 @@ export default function Home() {
       });
 
       setFiles(prev => [...prev, { id: newFileId, name: file.name }]);
+
+      // Refresh projects to catch auto-naming from backend
+      await refreshProjects();
     } catch (error: any) {
       triggerToast(error.response?.data?.dev_detail || "Vector upload pipeline crushed.");
     } finally {
@@ -55,6 +137,7 @@ export default function Home() {
     }
   };
 
+  // ─── Drag & Drop ───
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     if (!isDragging) setIsDragging(true);
@@ -62,7 +145,6 @@ export default function Home() {
 
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
-    // Prevent flickering when leaving child elements
     if (!e.currentTarget.contains(e.relatedTarget as Node)) {
       setIsDragging(false);
     }
@@ -71,21 +153,24 @@ export default function Home() {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       handleFileUpload(e.dataTransfer.files[0]);
     }
   };
 
+  // ─── Delete individual file ───
   const handleDeleteFile = async (fileId: string) => {
+    if (!activeProjectId) return;
     try {
       await apiClient.delete(`/data/project/${activeProjectId}/file/${fileId}`);
       setFiles(prev => prev.filter(f => f.id !== fileId));
     } catch (e: any) {
-      triggerToast(e.response?.data?.dev_detail || "Eradication sequence failed!");
+      triggerToast(e.response?.data?.dev_detail || "File deletion failed.");
     }
   };
 
+  // Don't render anything until we have an activeProjectId
+  const currentProjectName = projects.find(p => p.id === activeProjectId)?.name || activeProjectId || "New Workspace";
 
   return (
     <main 
@@ -113,20 +198,24 @@ export default function Home() {
                   <UploadCloud size={40} className="text-indigo-400" />
                 </div>
                 <h2 className="text-2xl font-bold text-white tracking-tight">Drop document to ingest</h2>
-                <p className="text-white/50 text-sm font-medium">Automatic chunking will initialize mapping into '{activeProjectId}'</p>
+                <p className="text-white/50 text-sm font-medium">Automatic chunking into &apos;{currentProjectName}&apos;</p>
              </div>
           </motion.div>
         )}
       </AnimatePresence>
 
       <Sidebar 
-        activeProjectId={activeProjectId} 
+        projects={projects}
+        activeProjectId={activeProjectId || ""}
         files={files}
         isUploading={isUploading}
         onFileUpload={handleFileUpload}
         onDeleteFile={handleDeleteFile}
+        onNewProject={handleNewProject}
+        onSwitchProject={handleSwitchProject}
+        onDeleteProject={handleDeleteProject}
       />
-      <ChatBox activeProjectId={activeProjectId} />
+      <ChatBox activeProjectId={activeProjectId || ""} />
     </main>
   );
 }
