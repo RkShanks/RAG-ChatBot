@@ -97,3 +97,89 @@ class LLMFactory:
             return client
         else:
             return SparseClient()
+
+    @staticmethod
+    def hot_swap_generation_client(
+        backend: str,
+        model_id: str,
+        api_key: str,
+        base_url: str = None,
+        runtime_settings: dict = None,
+    ) -> LLMInterface:
+        """
+        Create a new generation client with the provided overrides.
+        Returns the new client on success, raises on failure.
+        The caller is responsible for swapping app.state.generation_client.
+        """
+        rt = runtime_settings or {}
+        max_input = rt.get("max_input_characters", 32768)
+        max_output = rt.get("max_output_tokens", 32768)
+        temperature = rt.get("temperature", 0.1)
+
+        logger.info(f"Hot-swap: Creating new generation client for {backend}/{model_id}")
+
+        if backend == LLMEnums.OPENAI.value:
+            client = OpenAIClient(
+                api_key=api_key,
+                base_url=base_url if base_url else None,
+                default_max_input_characters=max_input,
+                default_max_output_tokens=max_output,
+                default_temperature=temperature,
+            )
+            client.set_generation_model(model_id)
+            return client
+        elif backend == LLMEnums.COHERE.value:
+            client = CohereClient(
+                api_key=api_key,
+                default_max_input_characters=max_input,
+                default_max_output_tokens=max_output,
+                default_temperature=temperature,
+            )
+            client.set_generation_model(model_id)
+            return client
+        elif backend == LLMEnums.GEMINI.value:
+            client = GeminiClient(
+                api_key=api_key,
+                default_max_input_characters=max_input,
+                default_max_output_tokens=max_output,
+                default_temperature=temperature,
+            )
+            client.set_generation_model(model_id)
+            return client
+        else:
+            raise ValueError(f"Unsupported generation backend: {backend}")
+
+    @staticmethod
+    def hot_swap_embedding_client(
+        backend: str,
+        model_id: str,
+        api_key: str,
+        base_url: str = None,
+    ) -> LLMInterface:
+        """
+        Create a new embedding client with the provided overrides.
+        Returns the new client on success, raises on failure.
+        """
+        logger.info(f"Hot-swap: Creating new embedding client for {backend}/{model_id}")
+
+        if backend == LLMEnums.OPENAI.value:
+            client = OpenAIClient(
+                api_key=api_key,
+                base_url=base_url if base_url else None,
+            )
+            client.set_embedding_model(model_id)
+            return client
+        elif backend == LLMEnums.COHERE.value:
+            client = CohereClient(
+                api_key=api_key,
+            )
+            client.set_embedding_model(model_id)
+            return client
+        elif backend == LLMEnums.GEMINI.value:
+            client = GeminiClient(
+                api_key=api_key,
+            )
+            client.set_embedding_model(model_id)
+            return client
+        else:
+            raise ValueError(f"Unsupported embedding backend: {backend}")
