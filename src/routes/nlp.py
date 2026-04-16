@@ -102,7 +102,7 @@ async def chat_with_project(
 
             if final_text.strip():
                 project.chat_history.append({"role": "user", "content": search_request.query})
-                project.chat_history.append({"role": "system", "content": final_text})
+                project.chat_history.append({"role": "assistant", "content": final_text})
                 await project_model.update_project(project)
 
         except CustomAPIException as e:
