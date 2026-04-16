@@ -62,6 +62,20 @@ class VectorDBInterface(ABC):
         pass
 
     @abstractmethod
+    async def delete_points_by_filter(self, collection_name: str, filter_criteria: Dict[str, Any]) -> bool:
+        """
+        Delete specific chunks (points) from a collection based on metadata criteria.
+        
+        Args:
+            collection_name (str): The name of the collection/index.
+            filter_criteria (dict): The exact metadata to filter points by (e.g., {"chunk_asset_id": "1234"}).
+            
+        Returns:
+            bool: True if operation successfully routed to the DB.
+        """
+        pass
+
+    @abstractmethod
     async def create_collection(
         self, collection_name: str, vector_size: int, distance_metric: str = "cosine", do_reset: bool = False
     ) -> bool:

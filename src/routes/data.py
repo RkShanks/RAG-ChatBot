@@ -161,3 +161,53 @@ async def delete_project(
         status_code=status.HTTP_200_OK,
         content={"signal": ResponseSignal.PROJECT_DELETED_SUCCESSFULLY.value}
     )
+
+@data_router.delete("/project/{project_id}/file/{file_id}")
+async def delete_project_file(
+    request: Request,
+    project_id: str,
+    file_id: str,
+    session_id: str = Depends(get_session_id),
+):
+    logger.debug(f"Received delete request for file '{file_id}' in project '{project_id}'")
+
+    project_model = ProjectModel(db_client=request.app.state.db_client)
+
+    # 1. Verify Ownership & Retrieve Project
+    project = await project_model.get_project(project_id=project_id, session_id=session_id)
+    if not project:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"signal": ResponseSignal.PROJECT_NOT_FOUND.value}
+        )
+
+    # 2. Retrieve the Specific Asset from MongoDB
+    asset_model = AssetModel(db_client=request.app.state.db_client)
+    asset = await asset_model.get_asset_by_id(asset_id=file_id)
+    if not asset or str(asset.asset_project_id) != str(project.id):
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"signal": ResponseSignal.FILE_NOT_FOUND.value}
+        )
+
+    # 3. Delete Qdrant Vector Data Associated with the File
+    base_controller = BaseController()
+    collection_name = base_controller.get_collection_name(project_id, session_id)
+    chunk_model = ChunkModel(vector_db_client=request.app.state.vector_db_client)
+    try:
+        await chunk_model.delete_chunks_by_asset_id(collection_name=collection_name, asset_id=file_id)
+    except Exception as e:
+        logger.warning(f"Vector DB point deletion failed or collection might not exist, skipping... Detail: {e}")
+
+    # 4. Physically eradicate the disk file
+    project_controller = ProjectController()
+    project_controller.delete_file_path(project_id=project_id, file_name=asset.asset_name)
+
+    # 5. Delete the MongoDB Asset config
+    await asset_model.delete_asset_by_id(asset_id=file_id)
+
+    logger.info(f"Successfully eradicated file '{file_id}' and all associated physical data.")
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={"signal": ResponseSignal.FILE_DELETED_SUCCESSFULLY.value}
+    )

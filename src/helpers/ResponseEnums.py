@@ -24,6 +24,7 @@ class ResponseSignal(Enum):
     FILE_UPLOADED_SUCCESSFULLY = ("file_uploaded_successfully", "Your file was uploaded successfully.")
     FILE_UPLOADED_FAILED = ("file_uploaded_failed", "There was an error uploading your file. Please try again.")
     FILE_NOT_FOUND = ("file_not_found", "The requested file could not be found.")
+    FILE_DELETED_SUCCESSFULLY = ("file_deleted_successfully", "The specific file and its vector data were permanently removed.")
 
     # --- Wikipedia Operations ---
     WIKI_SEARCH_RESULTS_FOUND = ("wiki_search_results_found", "Wikipedia search results retrieved successfully.")

@@ -122,6 +122,32 @@ class QdrantClient(VectorDBInterface):
                 dev_detail=f"Failed to delete collection: {collection_name}",
             ) from e
 
+    async def delete_points_by_filter(self, collection_name: str, filter_criteria: Dict[str, Any]) -> bool:
+        logger.debug(f"Attempting granular point deletion in '{collection_name}' with filter '{filter_criteria}'")
+        try:
+            if not await self.is_collection_exist(collection_name):
+                logger.warning(f"Collection {collection_name} does not exist. Ignoring deletion.")
+                return False
+
+            query_filter = self.create_query_filter(filter_criteria)
+            if not query_filter:
+                logger.warning("No filter provided. Aborting deletion to prevent wiping entire collection.")
+                return False
+
+            await self.client.delete(
+                collection_name=collection_name,
+                points_selector=models.FilterSelector(filter=query_filter)
+            )
+            logger.info(f"Successfully requested point deletion in '{collection_name}' for filter: {filter_criteria}")
+            return True
+
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.INTERNAL_SERVER_ERROR,
+                status_code=500,
+                dev_detail=f"Failed to delete granular points in Qdrant collection: {collection_name}. Detail: {e}",
+            ) from e
+
     async def create_collection(
         self,
         collection_name: str,
