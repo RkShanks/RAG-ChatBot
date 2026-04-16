@@ -143,10 +143,8 @@ export function ChatBox({ activeProjectId }: { activeProjectId: string }) {
               </div>
             </motion.div>
           ))}
-        </AnimatePresence>
-        <div ref={messagesEndRef} />
-        
-        <AnimatePresence>
+          <div ref={messagesEndRef} />
+          
           {isTyping && (
              <motion.div
                 key="typing-indicator"
