@@ -10,6 +10,7 @@ from helpers.dependencies import get_session_id
 from helpers.exceptions import CustomAPIException
 from models import ResponseSignal
 from routes.schemes.nlp import SearchRequest
+from models import ProjectModel
 
 logger = logging.getLogger(__name__)
 nlp_router = APIRouter(
@@ -65,6 +66,11 @@ async def chat_with_project(
 ):
     logger.debug(f"Chat request started for project '{project_id}' with query: {search_request.query}")
 
+    project_model = ProjectModel(db_client=request.app.state.db_client)
+    project = await project_model.get_project(project_id=project_id, session_id=session_id)
+    if not project:
+        raise CustomAPIException(ResponseSignal.PROJECT_NOT_FOUND, 404, "Project not found")
+
     nlp_controller = NLPController(
         vector_client=request.app.state.vector_db_client,
         generation_client=request.app.state.generation_client,
@@ -81,15 +87,23 @@ async def chat_with_project(
             stream, history = await nlp_controller.ask_question_stream(
                 project_id=project_id,
                 query=search_request.query,
-                chat_history=search_request.chat_history,
+                chat_history=project.chat_history,
                 limit=search_request.limit,
                 target_locale=search_request.target_locale,
             )
 
+            final_text = ""
             async for chunk in stream:
+                if chunk and chunk.get("type") in ["answer", "chunk"]:
+                    final_text += chunk.get("text", "")
                 # 'chunk' is the dictionary we created in the client e.g., {"type": "answer", "text": "مرحبا"}
                 safe_data = json.dumps(chunk, ensure_ascii=False)
                 yield f"data: {safe_data}\n\n"
+
+            if final_text.strip():
+                project.chat_history.append({"role": "user", "content": search_request.query})
+                project.chat_history.append({"role": "assistant", "content": final_text})
+                await project_model.update_project(project)
 
         except CustomAPIException as e:
             # SSE Error Handling: We catch our clean custom exception and send it as an SSE error event
@@ -110,6 +124,22 @@ async def chat_with_project(
         media_type="text/event-stream",
     )
 
+@nlp_router.get("/history/{project_id}")
+async def get_chat_history(
+    request: Request,
+    project_id: str,
+    session_id: str = Depends(get_session_id),
+):
+    from models import ProjectModel
+    project_model = ProjectModel(db_client=request.app.state.db_client)
+    project = await project_model.get_project(project_id=project_id, session_id=session_id)
+    if not project:
+        return JSONResponse(status_code=404, content={"signal": ResponseSignal.PROJECT_NOT_FOUND.value})
+
+    return JSONResponse(
+        status_code=200,
+        content={"signal": "success", "history": project.chat_history,}
+    )
 
 @nlp_router.post("/ask/generate/{project_id}")
 async def ask_project(
