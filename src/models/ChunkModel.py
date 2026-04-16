@@ -86,6 +86,19 @@ class ChunkModel:
         logger.info(f"Deleted collection: {collection_name}")
         return result
 
+    async def delete_chunks_by_asset_id(self, collection_name: str, asset_id: str) -> bool:
+        """
+        Deletes securely all chunks associated with a specific file (asset) inside the Qdrant DB.
+        """
+        logger.debug(f"Deleting all chunks for asset '{asset_id}' inside collection '{collection_name}'")
+        filter_criteria = {"chunk_asset_id": asset_id}
+        result = await self.vector_db_client.delete_points_by_filter(
+            collection_name=collection_name, 
+            filter_criteria=filter_criteria
+        )
+        logger.info(f"Deletion signals routed for asset_id: {asset_id} in {collection_name}")
+        return result
+
     async def create_document_chunks(
         self,
         chunk: DataChunk,

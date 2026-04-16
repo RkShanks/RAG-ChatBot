@@ -34,6 +34,32 @@ class AssetModel(BaseDataModel):
                 dev_detail=f"MongoDB failed to delete assets for project DB ID '{asset_project_id}'.",
             ) from e
 
+    async def get_asset_by_id(self, asset_id: str) -> Asset:
+        logger.debug(f"Retrieving asset by DB ID: {asset_id}")
+        try:
+            doc = await self.collection.find_one({"_id": ObjectId(asset_id)})
+            if not doc:
+                return None
+            return Asset.model_validate(doc)
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.ASSET_RETRIEVAL_FAILED,
+                status_code=500,
+                dev_detail=f"MongoDB query failed for asset ID '{asset_id}'.",
+            ) from e
+
+    async def delete_asset_by_id(self, asset_id: str) -> bool:
+        logger.debug(f"Deleting asset by DB ID: {asset_id}")
+        try:
+            result = await self.collection.delete_one({"_id": ObjectId(asset_id)})
+            return result.deleted_count > 0
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.INTERNAL_SERVER_ERROR,
+                status_code=500,
+                dev_detail=f"MongoDB failed to delete asset ID '{asset_id}'.",
+            ) from e
+
     async def create_asset(self, asset: Asset) -> Asset:
         logger.debug(f"Creating asset with name: {asset.asset_name}")
 

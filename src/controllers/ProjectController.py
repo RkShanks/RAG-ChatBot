@@ -45,3 +45,17 @@ class ProjectController(BaseController):
                     status_code=500,
                     dev_detail=f"OS failed to recursively delete project directory at path: {projects_dir}.",
                 ) from e
+
+    def delete_file_path(self, project_id: str, file_name: str):
+        projects_dir = self.get_project_path(project_id)
+        target_file = os.path.join(projects_dir, file_name)
+        if os.path.exists(target_file):
+            try:
+                os.remove(target_file)
+                logger.info(f"Physically deleted file: {target_file}")
+            except Exception as e:
+                raise CustomAPIException(
+                    signal_enum=ResponseSignal.INTERNAL_SERVER_ERROR,
+                    status_code=500,
+                    dev_detail=f"OS failed to delete file at path: {target_file}.",
+                ) from e
