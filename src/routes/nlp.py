@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from controllers import NLPController
 from helpers.config import Settings, get_settings
+from helpers.dependencies import get_session_id
 from helpers.exceptions import CustomAPIException
 from models import ResponseSignal
 from routes.schemes.nlp import SearchRequest
@@ -23,6 +24,7 @@ async def search_data(
     project_id: str,
     search_request: SearchRequest,
     app_settings: Settings = Depends(get_settings),
+    session_id: str = Depends(get_session_id),
 ):
     logger.debug(f"Search request started for project '{project_id}' with parameters: {search_request}")
 
@@ -32,6 +34,8 @@ async def search_data(
         embedding_client=request.app.state.embedding_client,
         sparse_embedding_client=request.app.state.sparse_embedding_client,
         reranker_client=request.app.state.ranker_client,
+        project_id=project_id,
+        session_id=session_id,
     )
 
     result = await nlp_controller.search_and_rerank(
@@ -57,6 +61,7 @@ async def chat_with_project(
     project_id: str,
     search_request: SearchRequest,
     app_settings: Settings = Depends(get_settings),
+    session_id: str = Depends(get_session_id),
 ):
     logger.debug(f"Chat request started for project '{project_id}' with query: {search_request.query}")
 
@@ -66,6 +71,8 @@ async def chat_with_project(
         embedding_client=request.app.state.embedding_client,
         sparse_embedding_client=request.app.state.sparse_embedding_client,
         reranker_client=request.app.state.ranker_client,
+        project_id=project_id,
+        session_id=session_id,
     )
 
     # 1. The Generator Wrapper
@@ -110,6 +117,7 @@ async def ask_project(
     project_id: str,
     search_request: SearchRequest,
     app_settings: Settings = Depends(get_settings),
+    session_id: str = Depends(get_session_id),
 ):
     logger.debug(f"Ask request started for project '{project_id}' with query: {search_request.query}")
 
@@ -119,6 +127,8 @@ async def ask_project(
         embedding_client=request.app.state.embedding_client,
         sparse_embedding_client=request.app.state.sparse_embedding_client,
         reranker_client=request.app.state.ranker_client,
+        project_id=project_id,
+        session_id=session_id,
     )
 
     response, history = await nlp_controller.ask_question(

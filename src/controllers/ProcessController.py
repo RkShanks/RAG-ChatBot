@@ -25,6 +25,7 @@ class ProcessController(BaseController):
     def __init__(
         self,
         project_id: str,
+        session_id: str,
         db_client,
         vector_client: VectorDBInterface,
         embedding_client: LLMInterface,
@@ -33,6 +34,7 @@ class ProcessController(BaseController):
     ):
         super().__init__()
         self.project_id = project_id
+        self.session_id = session_id
         self.project_dir = ProjectController().get_project_path(project_id=project_id)
 
         # Inject the active database connections
@@ -130,7 +132,7 @@ class ProcessController(BaseController):
     async def get_assets_to_process(self, file_id: str = None) -> list:
         """Helper to fetch the exact assets requested by the user."""
         # Ensure the project exists and cache the object for the chunker
-        self.project_obj = await self.project_model.get_project_or_create(project_id=self.project_id)
+        self.project_obj = await self.project_model.get_project_or_create(project_id=self.project_id, session_id=self.session_id)
 
         if file_id:
             logger.debug(f"Fetching specific file_id: '{file_id}'")
@@ -217,7 +219,7 @@ class ProcessController(BaseController):
         The Master Orchestrator.
         Executes the business rules for ingestion and returns a Result Dictionary to the Route.
         """
-        collection_name = self.get_collection_name(project_id=self.project_id)
+        collection_name = self.get_collection_name(project_id=self.project_id, session_id=self.session_id)
         operation_name = "Reset" if do_reset else "Create"
 
         # STEP 1: Create or Reset Collection
@@ -331,7 +333,7 @@ class ProcessController(BaseController):
         }
 
     async def get_vector_db_collection_info(self, project_id: str):
-        collection_name = self.get_collection_name(project_id=project_id)
+        collection_name = self.get_collection_name(project_id=project_id, session_id=self.session_id)
         logger.debug(f"Attempting to retrieve collection info for '{collection_name}'")
         try:
             info = await self.vector_client.get_collection_info(collection_name=collection_name)

@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 
 from controllers import DataController, Wiki_SearchController
 from helpers.config import Settings, get_settings
+from helpers.dependencies import get_session_id
 from models import AssetModel, ProjectModel, ResponseSignal
 from routes.schemes.wiki import SearchWikiRequest
 
@@ -21,12 +22,13 @@ async def wiki_search(
     project_id: str,
     wiki_search_request: SearchWikiRequest,
     app_settings: Settings = Depends(get_settings),
+    session_id: str = Depends(get_session_id),
 ):
     logger.debug(f"Received wiki search request for project '{project_id}' with query '{wiki_search_request.query}'")
 
     # 1. Get or Create Project (Let It Crash if MongoDB fails)
     project_model = ProjectModel(db_client=request.app.state.db_client)
-    project = await project_model.get_project_or_create(project_id=project_id)
+    project = await project_model.get_project_or_create(project_id=project_id, session_id=session_id)
 
     data_controller = DataController()
     wiki_search_controller = Wiki_SearchController()

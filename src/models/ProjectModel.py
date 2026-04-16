@@ -39,15 +39,15 @@ class ProjectModel(BaseDataModel):
 
         return project_data
 
-    async def get_project_or_create(self, project_id: str) -> Project:
-        logger.debug(f"Retrieving or creating project with ID: {project_id}")
-        # Try to find the project by its ID
+    async def get_project_or_create(self, project_id: str, session_id: str) -> Project:
+        logger.debug(f"Retrieving or creating project with ID: {project_id} for Session: {session_id}")
+        # Try to find the project by its ID and session
         try:
             # This finds the project. If it doesn't exist, it creates it instantly.
             # ReturnDocument.AFTER ensures it returns the newly created document.
             record = await self.collection.find_one_and_update(
-                {"project_id": project_id},
-                {"$setOnInsert": {"project_id": project_id}},
+                {"project_id": project_id, "session_id": session_id},
+                {"$setOnInsert": {"project_id": project_id, "session_id": session_id}},
                 upsert=True,
                 return_document=ReturnDocument.AFTER,
             )
@@ -61,13 +61,13 @@ class ProjectModel(BaseDataModel):
                 dev_detail=f"MongoDB failed to retrieve or upsert project '{project_id}'.",
             ) from e
 
-    async def get_all_projects(self, page: int, page_size: int) -> Tuple[List[Project], int]:
-        logger.debug(f"Retrieving all projects with pagination - Page: {page}, Page Size: {page_size}")
+    async def get_all_projects(self, page: int, page_size: int, session_id: str) -> Tuple[List[Project], int]:
+        logger.debug(f"Retrieving all projects with pagination - Page: {page}, Page Size: {page_size} for Session: {session_id}")
 
-        # 1. Count total documents
+        # 1. Count total documents for session
         try:
-            total_documents = await self.collection.count_documents({})
-            logger.info(f"Total projects in database: {total_documents}")
+            total_documents = await self.collection.count_documents({"session_id": session_id})
+            logger.info(f"Total projects in database for Session {session_id}: {total_documents}")
 
         except Exception as e:
             raise CustomAPIException(
@@ -82,7 +82,7 @@ class ProjectModel(BaseDataModel):
         # 3. Fetch the data for the requested page
         skip_amount = (page - 1) * page_size
         try:
-            cursor = self.collection.find({}).skip(skip_amount).limit(page_size)
+            cursor = self.collection.find({"session_id": session_id}).skip(skip_amount).limit(page_size)
             raw_documents = await cursor.to_list(length=page_size)
             logger.info(f"Fetched {len(raw_documents)} projects for page {page} with page size {page_size}")
 

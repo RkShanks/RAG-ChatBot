@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 
 from controllers import DataController, ProcessController
 from helpers.config import Settings, get_settings
+from helpers.dependencies import get_session_id
 from models import AssetModel, ProjectModel, ResponseSignal
 from routes.schemes.data import ProcessRequest
 
@@ -21,12 +22,13 @@ async def upload_data(
     project_id: str,
     file: UploadFile,
     app_settings: Settings = Depends(get_settings),
+    session_id: str = Depends(get_session_id),
 ):
     logger.debug(f"Received upload request for project '{project_id}' with file '{file.filename}'")
 
     # 1. Get or Create Project
     project_model = ProjectModel(db_client=request.app.state.db_client)
-    project = await project_model.get_project_or_create(project_id=project_id)
+    project = await project_model.get_project_or_create(project_id=project_id, session_id=session_id)
 
     # 2. Validate File
     data_controller = DataController()
@@ -69,11 +71,13 @@ async def process_data(
     request: Request,
     project_id: str,
     process_request: ProcessRequest,
+    session_id: str = Depends(get_session_id),
 ):
     logger.debug(f"Process request started for project '{project_id}' with parameters: {process_request}")
     # Instantiate controller
     controller = ProcessController(
         project_id=project_id,
+        session_id=session_id,
         db_client=request.app.state.db_client,
         vector_client=request.app.state.vector_db_client,
         embedding_client=request.app.state.embedding_client,
@@ -95,10 +99,12 @@ async def process_data(
 async def get_collection_info(
     request: Request,
     project_id: str,
+    session_id: str = Depends(get_session_id),
 ):
     logger.debug(f"Get process info request started for project '{project_id}'")
     controller = ProcessController(
         project_id=project_id,
+        session_id=session_id,
         db_client=request.app.state.db_client,
         vector_client=request.app.state.vector_db_client,
         embedding_client=request.app.state.embedding_client,
