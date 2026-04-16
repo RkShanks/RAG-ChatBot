@@ -9,6 +9,8 @@ class ResponseSignal(Enum):
     FILE_UPLOADED_SUCCESSFULLY = "file_uploaded_successfully"
     FILE_UPLOADED_FAILED = "file_uploaded_failed"
     FILE_NOT_FOUND = "file_not_found"
+    FILE_DELETED_SUCCESSFULLY = "file_deleted_successfully"
+    FILE_DELETION_FAILED = "file_deletion_failed"
 
     WIKI_SEARCH_RESULTS_FOUND = "wiki_search_results_found"
     WIKI_SEARCH_NO_RESULTS = "wiki_search_no_results"
@@ -43,3 +45,11 @@ class ResponseSignal(Enum):
     NLP_SEARCH_SUCCESSFUL = "nlp_search_successful"
     NLP_CHAT_FAILED = "nlp_chat_failed"
     NLP_CHAT_SUCCESSFUL = "nlp_chat_successful"
+
+    PROJECT_CREATION_FAILED = "project_creation_failed"
+    PROJECT_RETRIEVAL_FAILED = "project_retrieval_failed"
+    PROJECT_NOT_FOUND = "project_not_found"
+    PROJECT_DELETED_SUCCESSFULLY = "project_deleted_successfully"
+
+    EMBEDDING_FAILED = "embedding_failed"
+
