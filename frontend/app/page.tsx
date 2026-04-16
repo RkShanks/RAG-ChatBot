@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { ChatBox } from "./components/ChatBox";
 import { apiClient } from "./lib/api";
@@ -14,6 +14,22 @@ export default function Home() {
   const [files, setFiles] = useState<{id: string, name: string}[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const { triggerToast } = useErrorToast();
+
+  useEffect(() => {
+    const fetchExistingFiles = async () => {
+      try {
+        const res = await apiClient.get(`/data/files/${activeProjectId}`);
+        if (res.data && res.data.files) {
+          setFiles(res.data.files);
+        }
+      } catch (err: any) {
+        if (err.response?.status !== 404) {
+          console.warn("Could not fetch existing workspace files.");
+        }
+      }
+    };
+    fetchExistingFiles();
+  }, [activeProjectId]);
 
   const handleFileUpload = async (file: File) => {
     setIsUploading(true);

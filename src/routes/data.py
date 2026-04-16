@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from controllers import BaseController, DataController, ProcessController, ProjectController
 from helpers.config import Settings, get_settings
 from helpers.dependencies import get_session_id
-from models import AssetModel, ChunkModel, ProjectModel, ResponseSignal
+from models import AssetModel, ChunkModel, ProjectModel, ResponseSignal, AssetTypeEnum
 from routes.schemes.data import ProcessRequest
 
 logger = logging.getLogger(__name__)
@@ -115,6 +115,31 @@ async def get_collection_info(
         status_code=result["status"],
         content=result["content"],
     )
+
+@data_router.get("/files/{project_id}")
+async def get_project_files(
+    request: Request,
+    project_id: str,
+    session_id: str = Depends(get_session_id),
+):
+    project_model = ProjectModel(db_client=request.app.state.db_client)
+    project = await project_model.get_project(project_id=project_id, session_id=session_id)
+    if not project:
+        return JSONResponse(status_code=404, content={"signal": ResponseSignal.PROJECT_NOT_FOUND.value})
+
+    asset_model = AssetModel(db_client=request.app.state.db_client)
+    assets = await asset_model.get_all_project_assets(
+        asset_project_id=str(project.id),
+        asset_type=AssetTypeEnum.FILE.value,
+    )
+    
+    return JSONResponse(
+        content={
+            "signal": "success",
+            "files": [{"id": str(a.id), "name": a.asset_name} for a in assets]
+        }
+    )
+
 
 @data_router.delete("/project/{project_id}")
 async def delete_project(
