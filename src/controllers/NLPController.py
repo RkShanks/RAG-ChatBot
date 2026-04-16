@@ -197,6 +197,7 @@ CONSTRAINTS:
         limit: int = 5,
         target_locale: str = "Based in Query language",
         max_output_tokens: int = None,
+        temperature: float = None,
     ):
 
         chat_history = chat_history or []
@@ -214,9 +215,12 @@ CONSTRAINTS:
         # Step D: Inject the System Prompt as the FIRST message in the history list
         final_payload_history = [{"role": "system", "content": system_prompt}] + trimmed_history
 
-        # Step E: Generate the final response
+        # Step E: Generate the final response (with optional runtime temperature override)
         logger.info(f"Starting streaming LLM response for project {project_id}...")
+        gen_kwargs = {}
+        if temperature is not None:
+            gen_kwargs["temperature"] = temperature
         stream = self.generation_client.generate_text_stream(
-            prompt=query, chat_history=final_payload_history, max_output_tokens=max_output_tokens
+            prompt=query, chat_history=final_payload_history, max_output_tokens=max_output_tokens, **gen_kwargs
         )
         return stream, final_payload_history

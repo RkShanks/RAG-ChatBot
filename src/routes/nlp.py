@@ -82,14 +82,16 @@ async def chat_with_project(
     )
 
     # 1. The Generator Wrapper
+    rt = request.app.state.runtime_settings
     async def raw_generator():
         try:
             stream, history = await nlp_controller.ask_question_stream(
                 project_id=project_id,
                 query=search_request.query,
                 chat_history=project.chat_history,
-                limit=search_request.limit,
+                limit=rt.get("retrieval_limit", 5),
                 target_locale=search_request.target_locale,
+                temperature=rt.get("temperature"),
             )
 
             final_text = ""
