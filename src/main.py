@@ -12,7 +12,7 @@ from helpers.config import get_settings
 from helpers.exceptions import CustomAPIException
 from helpers.logger import setup_logging
 from models import AssetModel, ProjectModel, ResponseSignal
-from routes import base, data, nlp, wiki_search
+from routes import base, data, nlp, settings, wiki_search
 from services.llm import LLMFactory
 from services.ranker import RankerFactory
 from services.vectordb import VectorDBFactory
@@ -86,6 +86,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.exception("❌ CRITICAL: Failed to initialize Ranker backend")
         raise e
+
+    # 6. Initialize mutable runtime settings for live UI tuning
+    app.state.runtime_settings = {
+        "temperature": settings.GENERATION_TEMPERATURE,
+        "retrieval_limit": 5,
+        "max_output_tokens": settings.GENERATION_MAX_OUTPUT_TOKENS,
+    }
+    logger.info("✅ Runtime settings initialized.")
 
     yield
 
@@ -199,3 +207,4 @@ app.include_router(base.base_router)
 app.include_router(data.data_router)
 app.include_router(wiki_search.wiki_search_router)
 app.include_router(nlp.nlp_router)
+app.include_router(settings.settings_router)

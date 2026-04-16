@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { ChatBox } from "./components/ChatBox";
+import { SettingsPanel } from "./components/SettingsPanel";
 import { apiClient } from "./lib/api";
 import { useErrorToast } from "./lib/ToastContext";
 import { motion, AnimatePresence } from "framer-motion";
@@ -16,6 +17,8 @@ export default function Home() {
   const [isUploading, setIsUploading] = useState(false);
   const [files, setFiles] = useState<{id: string, name: string}[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [chatResetKey, setChatResetKey] = useState(0);
   const { triggerToast } = useErrorToast();
 
   // ─── Fetch all workspaces from the database ───
@@ -214,8 +217,23 @@ export default function Home() {
         onNewProject={handleNewProject}
         onSwitchProject={handleSwitchProject}
         onDeleteProject={handleDeleteProject}
+        onToggleSettings={() => setIsSettingsOpen(true)}
       />
-      <ChatBox activeProjectId={activeProjectId || ""} />
+      <ChatBox key={chatResetKey} activeProjectId={activeProjectId || ""} />
+      <SettingsPanel
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        onResetComplete={async () => {
+          const updated = await refreshProjects();
+          if (updated.length > 0) {
+            setActiveProjectId(updated[0].id);
+          } else {
+            setActiveProjectId(null);
+            setFiles([]);
+          }
+          setChatResetKey(prev => prev + 1);
+        }}
+      />
     </main>
   );
 }
