@@ -21,6 +21,19 @@ class AssetModel(BaseDataModel):
         self.collection = self.db_client[DataBaseEnum.COLLECTION_ASSETS_NAME.value]
         self.document_class = Asset
 
+    async def delete_project_assets(self, asset_project_id: str) -> bool:
+        logger.debug(f"Deleting all assets for project DB ID: {asset_project_id}")
+        try:
+            result = await self.collection.delete_many({"asset_project_id": ObjectId(asset_project_id)})
+            logger.info(f"Deleted {result.deleted_count} assets for project DB ID: {asset_project_id}")
+            return True
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.INTERNAL_SERVER_ERROR,
+                status_code=500,
+                dev_detail=f"MongoDB failed to delete assets for project DB ID '{asset_project_id}'.",
+            ) from e
+
     async def create_asset(self, asset: Asset) -> Asset:
         logger.debug(f"Creating asset with name: {asset.asset_name}")
 
