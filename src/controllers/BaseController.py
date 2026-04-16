@@ -45,5 +45,5 @@ class BaseController:
 
         return database_path
 
-    def get_collection_name(self, project_id: str) -> str:
-        return f"collection_{project_id}".strip()
+    def get_collection_name(self, project_id: str, session_id: str) -> str:
+        return f"collection_{session_id}_{project_id}".replace("-", "_").strip()

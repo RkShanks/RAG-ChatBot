@@ -31,6 +31,8 @@ CONSTRAINTS:
         embedding_client: LLMInterface,
         sparse_embedding_client: Optional[LLMInterface] = None,
         reranker_client: Optional[Any] = None,
+        project_id: Optional[str] = None,
+        session_id: Optional[str] = None,
     ):
         super().__init__()
         self.vector_client = vector_client
@@ -38,6 +40,8 @@ CONSTRAINTS:
         self.embedding_client = embedding_client
         self.sparse_client = sparse_embedding_client
         self.reranker_client = reranker_client
+        self.project_id = project_id
+        self.session_id = session_id
 
     async def search_and_rerank(
         self,
@@ -51,7 +55,7 @@ CONSTRAINTS:
         Reranking Step: Fetches a broad set of results (top 20 by default),
         then cross-encodes them to strictly judge relevance, returning the top 5.
         """
-        collection_name = self.get_collection_name(project_id)
+        collection_name = self.get_collection_name(project_id, self.session_id)
 
         # 1. Primary Embedding
         logger.debug(f"Generating query embeddings for search in '{collection_name}'...")
