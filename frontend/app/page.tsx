@@ -18,6 +18,7 @@ export default function Home() {
   const [files, setFiles] = useState<{id: string, name: string}[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [chatResetKey, setChatResetKey] = useState(0);
   const { triggerToast } = useErrorToast();
 
   // ─── Fetch all workspaces from the database ───
@@ -218,7 +219,7 @@ export default function Home() {
         onDeleteProject={handleDeleteProject}
         onToggleSettings={() => setIsSettingsOpen(true)}
       />
-      <ChatBox activeProjectId={activeProjectId || ""} />
+      <ChatBox key={chatResetKey} activeProjectId={activeProjectId || ""} />
       <SettingsPanel
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
@@ -230,6 +231,7 @@ export default function Home() {
             setActiveProjectId(null);
             setFiles([]);
           }
+          setChatResetKey(prev => prev + 1);
         }}
       />
     </main>
