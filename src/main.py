@@ -100,10 +100,21 @@ async def lifespan(app: FastAPI):
         logger.info("✅ Vector DB connection closed.")
 
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI(lifespan=lifespan)
 
 # This automatically generates a unique UUID for every single web request
 app.add_middleware(CorrelationIdMiddleware)
+
+# Integrate CORSMiddleware locally
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.exception_handler(Exception)
