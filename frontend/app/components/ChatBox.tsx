@@ -82,8 +82,11 @@ export function ChatBox({ activeProjectId }: { activeProjectId: string }) {
                 setIsTyping(false); // Hide the 3 bouncing dots as soon as real text starts rendering
                 setMessages(prev => {
                   const newArr = [...prev];
-                  // Append streamed chunk directly to latest system message
-                  newArr[newArr.length - 1].text += (data.text || "");
+                  const lastIndex = newArr.length - 1;
+                  newArr[lastIndex] = {
+                    ...newArr[lastIndex],
+                    text: newArr[lastIndex].text + (data.text || "")
+                  };
                   return newArr;
                 });
                 scrollToBottom();
