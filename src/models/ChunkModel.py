@@ -88,7 +88,7 @@ class ChunkModel:
 
     async def delete_chunks_by_asset_id(self, collection_name: str, asset_id: str) -> bool:
         """
-        Deletes securely all chunks associated with a specific file (asset) inside the Qdrant DB.
+        Deletes securely all chunks associated with a specific file (asset) inside the Vector DB.
         """
         logger.debug(f"Deleting all chunks for asset '{asset_id}' inside collection '{collection_name}'")
         filter_criteria = {"chunk_asset_id": asset_id}

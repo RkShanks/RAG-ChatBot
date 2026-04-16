@@ -47,7 +47,7 @@ export function Sidebar({ activeProjectId }: { activeProjectId: string }) {
 
   const handleDeleteFile = async (fileId: string) => {
     try {
-      // Fires our Custom Stage 2.5 Backend Pipeline!!
+      // Fires our Custom Backend Pipeline!!
       await apiClient.delete(`/data/project/${activeProjectId}/file/${fileId}`);
       setFiles(prev => prev.filter(f => f.id !== fileId));
     } catch (e: any) {

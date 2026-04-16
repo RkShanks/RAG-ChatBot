@@ -190,7 +190,7 @@ async def delete_project_file(
             content={"signal": ResponseSignal.FILE_NOT_FOUND.value}
         )
 
-    # 3. Delete Qdrant Vector Data Associated with the File
+    # 3. Delete VectorDB Data Associated with the File
     base_controller = BaseController()
     collection_name = base_controller.get_collection_name(project_id, session_id)
     chunk_model = ChunkModel(vector_db_client=request.app.state.vector_db_client)
