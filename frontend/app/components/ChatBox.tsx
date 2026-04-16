@@ -143,10 +143,13 @@ export function ChatBox({ activeProjectId }: { activeProjectId: string }) {
               </div>
             </motion.div>
           ))}
-          <div ref={messagesEndRef} />
-          
+        </AnimatePresence>
+        <div ref={messagesEndRef} />
+        
+        <AnimatePresence>
           {isTyping && (
              <motion.div
+                key="typing-indicator"
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 className="flex gap-4 max-w-4xl mx-auto w-full flex-row"
