@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Depends, Request, UploadFile
+from fastapi import APIRouter, Depends, Request, UploadFile, status
 from fastapi.responses import JSONResponse
 
 from controllers import BaseController, DataController, ProcessController, ProjectController
@@ -242,4 +242,30 @@ async def delete_project_file(
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={"signal": ResponseSignal.FILE_DELETED_SUCCESSFULLY.value}
+    )
+
+
+@data_router.get("/projects")
+async def get_all_session_projects(
+    request: Request,
+    page: int = 1,
+    page_size: int = 50,
+    session_id: str = Depends(get_session_id),
+):
+    """Returns all workspaces belonging to the current browser session."""
+    project_model = ProjectModel(db_client=request.app.state.db_client)
+    projects_list, total_pages = await project_model.get_all_projects(
+        page=page, page_size=page_size, session_id=session_id
+    )
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "signal": "success",
+            "projects": [
+                {"project_id": p.project_id, "project_name": p.project_name}
+                for p in projects_list
+            ],
+            "total_pages": total_pages,
+        },
     )
