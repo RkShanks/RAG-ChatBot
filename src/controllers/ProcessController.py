@@ -135,12 +135,13 @@ class ProcessController(BaseController):
         self.project_obj = await self.project_model.get_project_or_create(project_id=self.project_id, session_id=self.session_id)
 
         if file_id:
-            logger.debug(f"Fetching specific file_id: '{file_id}'")
-            asset = await self.asset_model.get_asset_record(
-                asset_project_id=str(self.project_obj.id),
-                asset_name=file_id,
-            )
-            return [asset] if asset else []
+            logger.debug(f"Fetching specific file_id (Database ID): '{file_id}'")
+            asset = await self.asset_model.get_asset_by_id(asset_id=file_id)
+            if asset and str(asset.asset_project_id) == str(self.project_obj.id):
+                return [asset]
+            else:
+                logger.warning(f"No asset found or project mismatch for file_id: {file_id}")
+                return []
         else:
             logger.debug(f"Fetching all files for project '{self.project_id}'")
             return await self.asset_model.get_all_project_assets(
