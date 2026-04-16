@@ -61,6 +61,30 @@ class ProjectModel(BaseDataModel):
                 dev_detail=f"MongoDB failed to retrieve or upsert project '{project_id}'.",
             ) from e
 
+    async def update_project(self, project: Project) -> Project:
+        logger.debug(f"Updating project with ID: {project.project_id}")
+        project_dict = project.model_dump(by_alias=True, exclude_none=True)
+        try:
+            # We must not update the _id field
+            project_id_obj = project_dict.pop("_id", None)
+            if not project_id_obj:
+                 await self.collection.update_one(
+                     {"project_id": project.project_id, "session_id": project.session_id},
+                     {"$set": project_dict}
+                 )
+            else:
+                 await self.collection.update_one(
+                     {"_id": project_id_obj},
+                     {"$set": project_dict}
+                 )
+            return project
+        except Exception as e:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.INTERNAL_SERVER_ERROR,
+                status_code=500,
+                dev_detail=f"MongoDB failed to update project '{project.project_id}'.",
+            ) from e
+
     async def get_project(self, project_id: str, session_id: str) -> Project:
         logger.debug(f"Retrieving project with ID: {project_id} for Session: {session_id}")
         try:

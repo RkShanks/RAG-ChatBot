@@ -30,6 +30,13 @@ async def upload_data(
     project_model = ProjectModel(db_client=request.app.state.db_client)
     project = await project_model.get_project_or_create(project_id=project_id, session_id=session_id)
 
+    # 1.5. Workspace Auto-Naming
+    if project.project_name == "Untitled Workspace" or not project.project_name:
+        # Strip the file extension to generate a clean title
+        clean_name = file.filename.rsplit(".", 1)[0]
+        project.project_name = clean_name
+        await project_model.update_project(project)
+
     # 2. Validate File
     data_controller = DataController()
     data_controller.validate_uploaded_file(file=file)
