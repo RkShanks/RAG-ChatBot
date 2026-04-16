@@ -9,6 +9,18 @@ class LLMEnums(Enum):
 
 
 class OPENAIEnum(Enum):
+    GENERATION_MODELS = [
+        "gpt-4o",
+        "gpt-4o-mini",
+        "gpt-4-turbo",
+    ]
+
+    EMBEDDING_MODELS = [
+        "text-embedding-3-small",
+        "text-embedding-3-large",
+        "text-embedding-ada-002",
+    ]
+
     DEFAULT_DIMENSIONS = {
         "text-embedding-3-small": 1536,
         "text-embedding-3-large": 3072,
@@ -21,6 +33,19 @@ class OPENAIEnum(Enum):
 
 
 class CohereEnum(Enum):
+    GENERATION_MODELS = [
+        "command-r-plus",
+        "command-r",
+        "command-light",
+    ]
+
+    EMBEDDING_MODELS = [
+        "embed-english-v3.0",
+        "embed-multilingual-v3.0",
+        "embed-english-light-v3.0",
+        "embed-multilingual-light-v3.0",
+    ]
+
     DEFAULT_DIMENSIONS = {
         "embed-english-v3.0": 1024,
         "embed-multilingual-v3.0": 1024,
@@ -38,6 +63,18 @@ class CohereEnum(Enum):
 
 
 class GeminiEnum(Enum):
+    GENERATION_MODELS = [
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-2.0-flash",
+    ]
+
+    EMBEDDING_MODELS = [
+        "gemini-embedding-001",
+        "text-embedding-004",
+        "gemini-embedding-2-preview",
+    ]
+
     DEFAULT_MODEL_ID = "gemini-2.5-flash"
     DEFAULT_MAX_OUTPUT_TOKENS = 2048
     DEFAULT_TEMPERATURE = 0.1
