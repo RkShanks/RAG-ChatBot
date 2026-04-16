@@ -26,6 +26,7 @@ export function Sidebar({
   onNewProject,
   onSwitchProject,
   onDeleteProject,
+  onToggleSettings,
 }: {
   projects: ProjectInfo[];
   activeProjectId: string;
@@ -36,6 +37,7 @@ export function Sidebar({
   onNewProject: () => void;
   onSwitchProject: (id: string) => void;
   onDeleteProject: (id: string) => void;
+  onToggleSettings: () => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -214,7 +216,7 @@ export function Sidebar({
 
       {/* ─── Settings Footer ─── */}
       <div className="mt-6 pt-6 border-t border-white/10">
-        <button className="flex items-center gap-3 text-sm text-white/50 hover:text-white/90 transition-colors w-full p-2 rounded-lg hover:bg-white/5">
+        <button onClick={onToggleSettings} className="flex items-center gap-3 text-sm text-white/50 hover:text-white/90 transition-colors w-full p-2 rounded-lg hover:bg-white/5">
           <Settings size={18} />
           Settings
         </button>
