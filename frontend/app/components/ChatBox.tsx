@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Send, Bot, User, Sparkles } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { getSessionId } from "../lib/api";
+import { apiClient, getSessionId } from "../lib/api";
 import { useErrorToast } from "../lib/ToastContext";
 
 type Message = {
@@ -23,6 +23,41 @@ export function ChatBox({ activeProjectId }: { activeProjectId: string }) {
   const [inputTitle, setInputTitle] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const { triggerToast } = useErrorToast();
+
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const res = await apiClient.get(`/nlp/history/${activeProjectId}`);
+        if (res.data && res.data.history && res.data.history.length > 0) {
+           const dbMessages = res.data.history.map((h: any) => ({
+              role: h.role,
+              text: h.content
+           }));
+           
+           setMessages([
+              { 
+                role: "system", 
+                text: "Hello! I am **Nimo**. I have access to your uploaded corporate documentation via strict _Hybrid Vector Search_ constraints.\n\n### How can I assist you today?\n- **Summarize** a loaded file.\n- **Extract** key numerical data.\n- **Search** for precise institutional knowledge."
+              },
+              ...dbMessages
+           ]);
+           // Intelligently auto-scroll after hydration
+           setTimeout(() => messagesEndRef.current?.scrollIntoView(), 150);
+        } else {
+             // Reset to clean slate if switching to an empty project
+             setMessages([{ 
+                role: "system", 
+                text: "Hello! I am **Nimo**. I have access to your uploaded corporate documentation via strict _Hybrid Vector Search_ constraints.\n\n### How can I assist you today?\n- **Summarize** a loaded file.\n- **Extract** key numerical data.\n- **Search** for precise institutional knowledge."
+              }]);
+        }
+      } catch (err: any) {
+        if(err.response?.status !== 404) {
+             console.warn("Could not fetch chat history.", err);
+        }
+      }
+    };
+    fetchHistory();
+  }, [activeProjectId]);
   
   // Create a ref attached to the message container to allow auto-scrolling
   const messagesEndRef = useRef<HTMLDivElement>(null);
