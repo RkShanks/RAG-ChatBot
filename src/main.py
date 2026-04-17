@@ -93,7 +93,25 @@ async def lifespan(app: FastAPI):
         "retrieval_limit": 5,
         "max_output_tokens": settings.GENERATION_MAX_OUTPUT_TOKENS,
     }
-    logger.info("✅ Runtime settings initialized.")
+
+    # 7. Initialize provider state for runtime hot-swapping
+    app.state.active_providers = {
+        "generation_backend": settings.GENERATION_BACKEND,
+        "generation_model": settings.GENERATION_MODEL_ID,
+        "embedding_backend": settings.EMBEDDING_BACKEND,
+        "embedding_model": settings.EMBEDDING_MODEL_ID,
+    }
+    app.state.api_keys = {
+        "openai": settings.OPENAI_API_KEY,
+        "cohere": settings.COHERE_API_KEY,
+        "gemini": settings.GEMINI_API_KEY,
+    }
+    app.state.connection_urls = {
+        "openai_base_url": settings.OPENAI_BASE_URL or "",
+        "qdrant_url": settings.QDRANT_URL,
+        "mongodb_uri": settings.MONGODB_URI,
+    }
+    logger.info("✅ Runtime settings and provider state initialized.")
 
     yield
 

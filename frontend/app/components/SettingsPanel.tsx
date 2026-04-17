@@ -15,6 +15,11 @@ import {
   Server,
   Brain,
   Layers,
+  Key,
+  Globe,
+  Link,
+  ChevronDown,
+  XCircle,
 } from "lucide-react";
 import { apiClient } from "../lib/api";
 
@@ -35,6 +40,18 @@ type TuningValues = {
   max_output_tokens: number;
 };
 
+type ProviderCatalog = {
+  generation_providers: string[];
+  generation_models: Record<string, string[]>;
+  embedding_providers: string[];
+  embedding_models: Record<string, string[]>;
+};
+
+type MaskedKeys = {
+  keys: Record<string, string>;
+  urls: Record<string, string>;
+};
+
 export function SettingsPanel({
   isOpen,
   onClose,
@@ -50,26 +67,81 @@ export function SettingsPanel({
     retrieval_limit: 5,
     max_output_tokens: 32768,
   });
+  const [catalog, setCatalog] = useState<ProviderCatalog | null>(null);
+  const [maskedKeys, setMaskedKeys] = useState<MaskedKeys | null>(null);
+
+  // Provider config state
+  const [genBackend, setGenBackend] = useState("");
+  const [genModel, setGenModel] = useState("");
+  const [genCustomModel, setGenCustomModel] = useState("");
+  const [embBackend, setEmbBackend] = useState("");
+  const [embModel, setEmbModel] = useState("");
+  const [embCustomModel, setEmbCustomModel] = useState("");
+  const [openaiBaseUrl, setOpenaiBaseUrl] = useState("");
+
+  // API Key state
+  const [genApiKey, setGenApiKey] = useState("");
+  const [embApiKey, setEmbApiKey] = useState("");
+
+  // UI state
   const [isSaving, setIsSaving] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isSwapping, setIsSwapping] = useState(false);
+  const [swapSuccess, setSwapSuccess] = useState(false);
+  const [swapError, setSwapError] = useState("");
+
+  const fetchAllData = async () => {
+    try {
+      const [infoRes, tuningRes, provRes, keysRes] = await Promise.all([
+        apiClient.get("/settings/info"),
+        apiClient.get("/settings/tuning"),
+        apiClient.get("/settings/providers"),
+        apiClient.get("/settings/keys"),
+      ]);
+      if (infoRes.data?.info) {
+        setInfo(infoRes.data.info);
+        setGenBackend(infoRes.data.info.generation_backend);
+        setGenModel(infoRes.data.info.generation_model);
+        setEmbBackend(infoRes.data.info.embedding_backend);
+        setEmbModel(infoRes.data.info.embedding_model);
+      }
+      if (tuningRes.data?.tuning) setTuning(tuningRes.data.tuning);
+      if (provRes.data) setCatalog(provRes.data);
+      if (keysRes.data) {
+        setMaskedKeys(keysRes.data);
+        setOpenaiBaseUrl(keysRes.data.urls?.openai_base_url || "");
+      }
+    } catch (err) {
+      console.warn("Failed to fetch settings", err);
+    }
+  };
 
   useEffect(() => {
     if (!isOpen) return;
-    const fetchData = async () => {
-      try {
-        const [infoRes, tuningRes] = await Promise.all([
-          apiClient.get("/settings/info"),
-          apiClient.get("/settings/tuning"),
-        ]);
-        if (infoRes.data?.info) setInfo(infoRes.data.info);
-        if (tuningRes.data?.tuning) setTuning(tuningRes.data.tuning);
-      } catch (err) {
-        console.warn("Failed to fetch settings", err);
-      }
-    };
-    fetchData();
+    fetchAllData();
   }, [isOpen]);
+
+  // When generation backend changes, reset the model to first in list
+  useEffect(() => {
+    if (catalog && genBackend) {
+      const models = catalog.generation_models[genBackend] || [];
+      if (models.length > 0 && !models.includes(genModel)) {
+        setGenModel(models[0]);
+      }
+      setGenCustomModel("");
+    }
+  }, [genBackend]);
+
+  useEffect(() => {
+    if (catalog && embBackend) {
+      const models = catalog.embedding_models[embBackend] || [];
+      if (models.length > 0 && !models.includes(embModel)) {
+        setEmbModel(models[0]);
+      }
+      setEmbCustomModel("");
+    }
+  }, [embBackend]);
 
   const handleApplyTuning = async () => {
     setIsSaving(true);
@@ -82,6 +154,42 @@ export function SettingsPanel({
       console.error("Failed to save tuning", err);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleApplyProvider = async () => {
+    setIsSwapping(true);
+    setSwapSuccess(false);
+    setSwapError("");
+    try {
+      const payload: Record<string, string> = {
+        generation_backend: genBackend,
+        generation_model: genCustomModel || genModel,
+        embedding_backend: embBackend,
+        embedding_model: embCustomModel || embModel,
+      };
+      if (genApiKey) payload.generation_api_key = genApiKey;
+      if (embApiKey) payload.embedding_api_key = embApiKey;
+      if (openaiBaseUrl) payload.openai_base_url = openaiBaseUrl;
+
+      const res = await apiClient.put("/settings/provider", payload);
+      if (res.data?.signal === "success") {
+        setSwapSuccess(true);
+        setGenApiKey("");
+        setEmbApiKey("");
+        // Refresh info to reflect change
+        const newInfo = await apiClient.get("/settings/info");
+        if (newInfo.data?.info) setInfo(newInfo.data.info);
+        const newKeys = await apiClient.get("/settings/keys");
+        if (newKeys.data) setMaskedKeys(newKeys.data);
+        setTimeout(() => setSwapSuccess(false), 3000);
+      }
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail || "Unknown error";
+      setSwapError(detail);
+      setTimeout(() => setSwapError(""), 5000);
+    } finally {
+      setIsSwapping(false);
     }
   };
 
@@ -106,11 +214,15 @@ export function SettingsPanel({
     }
   };
 
+  const showOpenaiUrl = genBackend === "OPENAI" || embBackend === "OPENAI";
+  const genModels = catalog?.generation_models[genBackend] || [];
+  const embModels = catalog?.embedding_models[embBackend] || [];
+  const providers = (catalog?.generation_providers || []).filter((p) => p !== "LOCAL");
+
   return (
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -118,14 +230,12 @@ export function SettingsPanel({
             onClick={onClose}
             className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
           />
-
-          {/* Panel */}
           <motion.div
-            initial={{ x: 400, opacity: 0 }}
+            initial={{ x: 450, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            exit={{ x: 400, opacity: 0 }}
+            exit={{ x: 450, opacity: 0 }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="fixed right-0 top-0 h-full w-[420px] glass bg-[#12141a]/95 border-l border-white/10 z-50 flex flex-col shadow-2xl"
+            className="fixed right-0 top-0 h-full w-[450px] glass bg-[#12141a]/95 border-l border-white/10 z-50 flex flex-col shadow-2xl"
           >
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-white/10">
@@ -145,7 +255,6 @@ export function SettingsPanel({
               </motion.button>
             </div>
 
-            {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
               {/* ─── Section 1: System Info ─── */}
               <div>
@@ -153,46 +262,191 @@ export function SettingsPanel({
                   System Information
                 </h3>
                 <div className="space-y-2">
-                  <InfoBadge
-                    icon={<Brain size={14} />}
-                    label="Generation"
-                    value={info ? `${info.generation_backend} → ${info.generation_model}` : "Loading..."}
-                    color="indigo"
-                  />
-                  <InfoBadge
-                    icon={<Layers size={14} />}
-                    label="Embedding"
-                    value={info ? `${info.embedding_backend} → ${info.embedding_model}` : "Loading..."}
-                    color="emerald"
-                  />
-                  <InfoBadge
-                    icon={<Database size={14} />}
-                    label="Vector DB"
-                    value={info?.vector_db_backend || "Loading..."}
-                    color="amber"
-                  />
-                  <InfoBadge
-                    icon={<Search size={14} />}
-                    label="Reranker"
-                    value={info?.reranker_backend || "Loading..."}
-                    color="cyan"
-                  />
-                  <InfoBadge
-                    icon={<Server size={14} />}
-                    label="Database"
-                    value={info ? `${info.database_name} @ ${info.database_uri.split("@").pop()}` : "Loading..."}
-                    color="violet"
-                  />
+                  <InfoBadge icon={<Brain size={14} />} label="Generation" value={info ? `${info.generation_backend} → ${info.generation_model}` : "Loading..."} color="indigo" />
+                  <InfoBadge icon={<Layers size={14} />} label="Embedding" value={info ? `${info.embedding_backend} → ${info.embedding_model}` : "Loading..."} color="emerald" />
+                  <InfoBadge icon={<Database size={14} />} label="Vector DB" value={info?.vector_db_backend || "Loading..."} color="amber" />
+                  <InfoBadge icon={<Search size={14} />} label="Reranker" value={info?.reranker_backend || "Loading..."} color="cyan" />
+                  <InfoBadge icon={<Server size={14} />} label="Database" value={info ? `${info.database_name} @ ${info.database_uri.split("@").pop()}` : "Loading..."} color="violet" />
                 </div>
               </div>
 
-              {/* ─── Section 2: Live Tuning ─── */}
+              {/* ─── Section 2: Provider Configuration ─── */}
+              <div>
+                <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-3">
+                  Provider Configuration
+                </h3>
+                <div className="space-y-3">
+                  {/* Generation Provider */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-white/50 uppercase tracking-wider">Generation Provider</label>
+                    <div className="relative">
+                      <select
+                        value={genBackend}
+                        onChange={(e) => setGenBackend(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white/80 appearance-none outline-none focus:border-indigo-500/50 cursor-pointer"
+                      >
+                        {providers.map((p) => (
+                          <option key={p} value={p} className="bg-[#1a1d24]">{p}</option>
+                        ))}
+                      </select>
+                      <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  {/* Generation Model */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-white/50 uppercase tracking-wider">Generation Model</label>
+                    <div className="relative">
+                      <select
+                        value={genModel}
+                        onChange={(e) => setGenModel(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white/80 appearance-none outline-none focus:border-indigo-500/50 cursor-pointer"
+                      >
+                        {genModels.map((m) => (
+                          <option key={m} value={m} className="bg-[#1a1d24]">{m}</option>
+                        ))}
+                      </select>
+                      <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Or type custom model name..."
+                      value={genCustomModel}
+                      onChange={(e) => setGenCustomModel(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white/60 outline-none focus:border-indigo-500/50 placeholder:text-white/20"
+                    />
+                  </div>
+
+                  <div className="border-t border-white/5 my-2" />
+
+                  {/* Embedding Provider */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-white/50 uppercase tracking-wider">Embedding Provider</label>
+                    <div className="relative">
+                      <select
+                        value={embBackend}
+                        onChange={(e) => setEmbBackend(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white/80 appearance-none outline-none focus:border-emerald-500/50 cursor-pointer"
+                      >
+                        {providers.map((p) => (
+                          <option key={p} value={p} className="bg-[#1a1d24]">{p}</option>
+                        ))}
+                      </select>
+                      <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  {/* Embedding Model */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-white/50 uppercase tracking-wider">Embedding Model</label>
+                    <div className="relative">
+                      <select
+                        value={embModel}
+                        onChange={(e) => setEmbModel(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white/80 appearance-none outline-none focus:border-emerald-500/50 cursor-pointer"
+                      >
+                        {embModels.map((m) => (
+                          <option key={m} value={m} className="bg-[#1a1d24]">{m}</option>
+                        ))}
+                      </select>
+                      <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Or type custom model name..."
+                      value={embCustomModel}
+                      onChange={(e) => setEmbCustomModel(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white/60 outline-none focus:border-emerald-500/50 placeholder:text-white/20"
+                    />
+                  </div>
+
+                  {/* OpenAI Base URL */}
+                  {showOpenaiUrl && (
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] text-white/50 uppercase tracking-wider flex items-center gap-1">
+                        <Globe size={10} /> OpenAI Base URL
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="https://api.openai.com/v1 (or Ollama/vLLM URL)"
+                        value={openaiBaseUrl}
+                        onChange={(e) => setOpenaiBaseUrl(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white/70 outline-none focus:border-amber-500/50 placeholder:text-white/20"
+                      />
+                      <p className="text-[10px] text-white/25">For local models: http://localhost:11434/v1</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* ─── Section 3: API Keys ─── */}
+              <div>
+                <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                  <Key size={10} /> API Keys
+                </h3>
+                <div className="space-y-3">
+                  <KeyInput
+                    label={`${genBackend} Key (Generation)`}
+                    masked={maskedKeys?.keys?.[genBackend.toLowerCase()] || "Not Set"}
+                    value={genApiKey}
+                    onChange={setGenApiKey}
+                  />
+                  {embBackend !== genBackend && (
+                    <KeyInput
+                      label={`${embBackend} Key (Embedding)`}
+                      masked={maskedKeys?.keys?.[embBackend.toLowerCase()] || "Not Set"}
+                      value={embApiKey}
+                      onChange={setEmbApiKey}
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Apply Provider Button */}
+              <div>
+                {swapError && (
+                  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 mb-3">
+                    <XCircle size={14} className="text-red-400 shrink-0" />
+                    <p className="text-[11px] text-red-300 leading-snug">{swapError}</p>
+                  </div>
+                )}
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleApplyProvider}
+                  disabled={isSwapping}
+                  className={`w-full py-2.5 rounded-xl flex items-center justify-center gap-2 text-sm font-medium transition-all ${
+                    swapSuccess
+                      ? "bg-emerald-600/30 border border-emerald-500/40 text-emerald-200"
+                      : "bg-indigo-600/20 hover:bg-indigo-600/40 border border-indigo-500/30 text-indigo-100"
+                  }`}
+                >
+                  {isSwapping ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : swapSuccess ? (
+                    <Check size={14} />
+                  ) : null}
+                  {swapSuccess ? "Provider Swapped!" : "Apply Provider & Keys"}
+                </motion.button>
+              </div>
+
+              {/* ─── Section 4: Connection URLs ─── */}
+              <div>
+                <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                  <Link size={10} /> Connection URLs
+                </h3>
+                <div className="space-y-2">
+                  <InfoBadge icon={<Database size={14} />} label="Qdrant" value={maskedKeys?.urls?.qdrant_url || "Not Set"} color="amber" />
+                  <InfoBadge icon={<Server size={14} />} label="MongoDB" value={maskedKeys?.urls?.mongodb_uri || "Not Set"} color="violet" />
+                </div>
+              </div>
+
+              {/* ─── Section 5: Live Tuning ─── */}
               <div>
                 <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-3">
                   Live Tuning
                 </h3>
                 <div className="space-y-4">
-                  {/* Temperature */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -203,24 +457,14 @@ export function SettingsPanel({
                         {tuning.temperature.toFixed(1)}
                       </span>
                     </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="2"
-                      step="0.1"
-                      value={tuning.temperature}
-                      onChange={(e) =>
-                        setTuning((prev) => ({ ...prev, temperature: parseFloat(e.target.value) }))
-                      }
-                      className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-indigo-500 bg-white/10"
-                    />
+                    <input type="range" min="0" max="2" step="0.1" value={tuning.temperature}
+                      onChange={(e) => setTuning((prev) => ({ ...prev, temperature: parseFloat(e.target.value) }))}
+                      className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-indigo-500 bg-white/10" />
                     <div className="flex justify-between text-[10px] text-white/30">
-                      <span>Precise</span>
-                      <span>Creative</span>
+                      <span>Precise</span><span>Creative</span>
                     </div>
                   </div>
 
-                  {/* Retrieval Limit */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -231,44 +475,26 @@ export function SettingsPanel({
                         {tuning.retrieval_limit}
                       </span>
                     </div>
-                    <input
-                      type="range"
-                      min="1"
-                      max="20"
-                      step="1"
-                      value={tuning.retrieval_limit}
-                      onChange={(e) =>
-                        setTuning((prev) => ({ ...prev, retrieval_limit: parseInt(e.target.value) }))
-                      }
-                      className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-emerald-500 bg-white/10"
-                    />
+                    <input type="range" min="1" max="20" step="1" value={tuning.retrieval_limit}
+                      onChange={(e) => setTuning((prev) => ({ ...prev, retrieval_limit: parseInt(e.target.value) }))}
+                      className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-emerald-500 bg-white/10" />
                     <div className="flex justify-between text-[10px] text-white/30">
-                      <span>Focused (1)</span>
-                      <span>Broad (20)</span>
+                      <span>Focused (1)</span><span>Broad (20)</span>
                     </div>
                   </div>
 
-                  {/* Max Output Tokens */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Cpu size={14} className="text-violet-400" />
                         <span className="text-xs text-white/70">Max Output Tokens</span>
                       </div>
-                      <input
-                        type="number"
-                        min="64"
-                        max="65536"
-                        value={tuning.max_output_tokens}
-                        onChange={(e) =>
-                          setTuning((prev) => ({ ...prev, max_output_tokens: parseInt(e.target.value) || 2048 }))
-                        }
-                        className="w-24 text-xs font-mono text-violet-400 bg-violet-500/10 px-2 py-1 rounded-md border border-violet-500/20 text-right outline-none focus:border-violet-500/50"
-                      />
+                      <input type="number" min="64" max="65536" value={tuning.max_output_tokens}
+                        onChange={(e) => setTuning((prev) => ({ ...prev, max_output_tokens: parseInt(e.target.value) || 2048 }))}
+                        className="w-24 text-xs font-mono text-violet-400 bg-violet-500/10 px-2 py-1 rounded-md border border-violet-500/20 text-right outline-none focus:border-violet-500/50" />
                     </div>
                   </div>
 
-                  {/* Apply Button */}
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
@@ -280,30 +506,22 @@ export function SettingsPanel({
                         : "bg-indigo-600/20 hover:bg-indigo-600/40 border border-indigo-500/30 text-indigo-100"
                     }`}
                   >
-                    {isSaving ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : saveSuccess ? (
-                      <Check size={14} />
-                    ) : null}
-                    {saveSuccess ? "Applied!" : "Apply Changes"}
+                    {isSaving ? <Loader2 size={14} className="animate-spin" /> : saveSuccess ? <Check size={14} /> : null}
+                    {saveSuccess ? "Applied!" : "Apply Tuning"}
                   </motion.button>
                 </div>
               </div>
 
-              {/* ─── Section 3: Danger Zone ─── */}
+              {/* ─── Section 6: Danger Zone ─── */}
               <div>
-                <h3 className="text-[10px] font-bold text-red-400/60 uppercase tracking-widest mb-3">
-                  Danger Zone
-                </h3>
+                <h3 className="text-[10px] font-bold text-red-400/60 uppercase tracking-widest mb-3">Danger Zone</h3>
                 <div className="p-4 rounded-xl border border-red-500/20 bg-red-500/5">
                   <div className="flex items-start gap-3 mb-3">
                     <AlertTriangle size={16} className="text-red-400 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-xs text-white/70 leading-relaxed">
-                        This will permanently destroy <strong className="text-red-300">all workspaces</strong>, uploaded files,
-                        vector embeddings, and chat history for your current session.
-                      </p>
-                    </div>
+                    <p className="text-xs text-white/70 leading-relaxed">
+                      This will permanently destroy <strong className="text-red-300">all workspaces</strong>, uploaded files,
+                      vector embeddings, and chat history for your current session.
+                    </p>
                   </div>
                   <motion.button
                     whileHover={{ scale: 1.02 }}
@@ -312,11 +530,7 @@ export function SettingsPanel({
                     disabled={isResetting}
                     className="w-full py-2.5 bg-red-600/20 hover:bg-red-600/40 border border-red-500/30 text-red-200 rounded-xl flex items-center justify-center gap-2 text-sm font-medium transition-all"
                   >
-                    {isResetting ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <AlertTriangle size={14} />
-                    )}
+                    {isResetting ? <Loader2 size={14} className="animate-spin" /> : <AlertTriangle size={14} />}
                     {isResetting ? "Destroying..." : "Nuclear Reset"}
                   </motion.button>
                 </div>
@@ -329,18 +543,9 @@ export function SettingsPanel({
   );
 }
 
-/* ─── Info Badge Sub-Component ─── */
-function InfoBadge({
-  icon,
-  label,
-  value,
-  color,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  color: string;
-}) {
+/* ─── Sub-Components ─── */
+
+function InfoBadge({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string; color: string }) {
   const colorMap: Record<string, string> = {
     indigo: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20",
     emerald: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
@@ -348,13 +553,30 @@ function InfoBadge({
     cyan: "text-cyan-400 bg-cyan-500/10 border-cyan-500/20",
     violet: "text-violet-400 bg-violet-500/10 border-violet-500/20",
   };
-
   return (
     <div className={`flex items-center gap-3 p-2.5 rounded-lg border ${colorMap[color] || colorMap.indigo}`}>
       <div className={colorMap[color]?.split(" ")[0]}>{icon}</div>
       <div className="flex-1 min-w-0">
         <p className="text-[10px] text-white/40 uppercase tracking-wider">{label}</p>
         <p className="text-xs text-white/80 truncate">{value}</p>
+      </div>
+    </div>
+  );
+}
+
+function KeyInput({ label, masked, value, onChange }: { label: string; masked: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="space-y-1">
+      <label className="text-[10px] text-white/50 uppercase tracking-wider">{label}</label>
+      <div className="relative">
+        <input
+          type="password"
+          placeholder={masked}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white/70 outline-none focus:border-amber-500/50 placeholder:text-white/30"
+        />
+        <Key size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20" />
       </div>
     </div>
   );
