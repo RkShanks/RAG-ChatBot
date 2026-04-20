@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -22,6 +22,7 @@ import {
   XCircle,
   User,
   Pencil,
+  CloudUpload,
 } from "lucide-react";
 import { apiClient } from "../lib/api";
 
@@ -58,6 +59,7 @@ export type UserProfile = {
   session_id: string;
   display_name: string;
   avatar_color: string;
+  avatar_base64?: string;
 };
 
 export function SettingsPanel({
@@ -99,6 +101,8 @@ export function SettingsPanel({
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState("");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // UI state
   const [isSaving, setIsSaving] = useState(false);
@@ -182,6 +186,64 @@ export function SettingsPanel({
     } finally {
       setIsSavingProfile(false);
     }
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingAvatar(true);
+    try {
+      const reader = new FileReader();
+      const img = new Image();
+      reader.onload = (evt) => {
+        img.onload = async () => {
+          const canvas = document.createElement("canvas");
+          const MAX_SIZE = 150;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_SIZE) {
+              height *= MAX_SIZE / width;
+              width = MAX_SIZE;
+            }
+          } else {
+            if (height > MAX_SIZE) {
+              width *= MAX_SIZE / height;
+              height = MAX_SIZE;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(img, 0, 0, width, height);
+
+          const base64Avatar = canvas.toDataURL("image/jpeg", 0.8);
+
+          try {
+             const res = await apiClient.put("/settings/profile", {
+               avatar_base64: base64Avatar,
+             });
+             if (res.data?.profile) {
+               onProfileUpdate(res.data.profile);
+             }
+          } catch(err) {
+             console.error("Failed to upload avatar", err);
+          } finally {
+             setIsUploadingAvatar(false);
+          }
+        };
+        img.src = evt.target?.result as string;
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error(err);
+      setIsUploadingAvatar(false);
+    }
+    
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleApplyTuning = async () => {
@@ -313,15 +375,40 @@ export function SettingsPanel({
                 <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-3 flex items-center gap-1.5">
                   <User size={10} /> User Profile
                 </h3>
+                <input 
+                  type="file" 
+                  accept="image/png, image/jpeg, image/webp" 
+                  ref={fileInputRef}
+                  style={{ display: "none" }}
+                  onChange={handleAvatarUpload}
+                />
                 <div className="flex items-center gap-4 p-4 rounded-xl border border-white/10 bg-white/[0.02]">
                   {/* Avatar Circle */}
                   <div
-                    className="w-14 h-14 rounded-full flex items-center justify-center shrink-0 shadow-lg ring-2 ring-white/10 transition-all"
-                    style={{ backgroundColor: avatarColor }}
+                    onClick={() => !isUploadingAvatar && fileInputRef.current?.click()}
+                    className={`w-14 h-14 rounded-full flex items-center justify-center shrink-0 shadow-lg ring-2 ring-white/10 transition-all cursor-pointer relative overflow-hidden group ${
+                      isUploadingAvatar ? "opacity-50 pointer-events-none" : "hover:ring-indigo-500/50"
+                    }`}
+                    style={!userProfile?.avatar_base64 ? { backgroundColor: avatarColor } : undefined}
                   >
-                    <span className="text-lg font-bold text-white/90 select-none">
-                      {getInitials(displayName)}
-                    </span>
+                    {userProfile?.avatar_base64 ? (
+                      <img src={userProfile.avatar_base64} alt="User Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-lg font-bold text-white/90 select-none">
+                        {getInitials(displayName)}
+                      </span>
+                    )}
+
+                    {!isUploadingAvatar && (
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                         <CloudUpload size={16} className="text-white" />
+                      </div>
+                    )}
+                    {isUploadingAvatar && (
+                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                         <Loader2 size={16} className="text-white animate-spin" />
+                      </div>
+                    )}
                   </div>
 
                   {/* Name + Edit */}

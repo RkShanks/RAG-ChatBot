@@ -14,6 +14,8 @@ import {
   Loader2,
 } from "lucide-react";
 
+import type { UserProfile } from "./SettingsPanel";
+
 type ProjectInfo = { id: string; name: string };
 
 export function Sidebar({
@@ -27,6 +29,7 @@ export function Sidebar({
   onSwitchProject,
   onDeleteProject,
   onToggleSettings,
+  userProfile,
 }: {
   projects: ProjectInfo[];
   activeProjectId: string;
@@ -38,6 +41,7 @@ export function Sidebar({
   onSwitchProject: (id: string) => void;
   onDeleteProject: (id: string) => void;
   onToggleSettings: () => void;
+  userProfile: UserProfile | null;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -50,8 +54,8 @@ export function Sidebar({
     >
       {/* ─── Brand Header ─── */}
       <div className="flex items-center gap-3 mb-8 mt-2">
-        <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shadow-[0_0_15px_rgba(79,70,229,0.5)]">
-          <Database size={16} className="text-white" />
+        <div className="w-[45px] h-[45px] flex items-center justify-center shrink-0 rounded-full border-2 border-indigo-500/50 shadow-[0_0_15px_rgba(79,70,229,0.5)] overflow-hidden bg-indigo-500/10 p-[2px]">
+          <img src="/nimo-avatar.png" alt="Nimo" className="w-full h-full object-cover rounded-full" />
         </div>
         <h1 className="text-xl font-bold tracking-tight text-white/90">
           Nimo RAG
@@ -216,9 +220,21 @@ export function Sidebar({
 
       {/* ─── Settings Footer ─── */}
       <div className="mt-6 pt-6 border-t border-white/10">
-        <button onClick={onToggleSettings} className="flex items-center gap-3 text-sm text-white/50 hover:text-white/90 transition-colors w-full p-2 rounded-lg hover:bg-white/5">
-          <Settings size={18} />
-          Settings
+        <button onClick={onToggleSettings} className="flex items-center gap-3 w-full p-2 rounded-xl hover:bg-white/5 transition-all outline-none text-left border border-transparent hover:border-white/5 relative overflow-hidden group">
+          <div className="w-[38px] h-[38px] rounded-full flex items-center justify-center shrink-0 shadow-lg ring-1 ring-white/10 overflow-hidden" style={!userProfile?.avatar_base64 ? { backgroundColor: userProfile?.avatar_color || "hsl(220, 70%, 50%)" } : undefined}>
+             {userProfile?.avatar_base64 ? (
+               <img src={userProfile.avatar_base64} alt="User" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+             ) : (
+               <span className="text-sm font-bold text-white/90 select-none">
+                 {userProfile?.display_name ? userProfile.display_name.charAt(0).toUpperCase() : "?"}
+               </span>
+             )}
+          </div>
+          <div className="flex-1 min-w-0">
+             <p className="text-sm font-medium text-white/90 truncate">{userProfile?.display_name || "Anonymous User"}</p>
+             <p className="text-[10px] text-white/40 truncate">Settings & Profile</p>
+          </div>
+          <Settings size={16} className="text-white/30 shrink-0 group-hover:rotate-90 transition-transform duration-500" />
         </button>
       </div>
     </motion.aside>
