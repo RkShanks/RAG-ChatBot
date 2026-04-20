@@ -50,7 +50,7 @@ async def search_data(
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
-            "signal": ResponseSignal.NLP_SEARCH_SUCCESSFUL.value,
+            "signal": ResponseSignal.NLP_SEARCH_SUCCESSFUL.signal, "message": ResponseSignal.NLP_SEARCH_SUCCESSFUL.message,
             "results": [doc.model_dump() for doc in result],
         },
     )
@@ -136,7 +136,7 @@ async def get_chat_history(
     project_model = ProjectModel(db_client=request.app.state.db_client)
     project = await project_model.get_project(project_id=project_id, session_id=session_id)
     if not project:
-        return JSONResponse(status_code=404, content={"signal": ResponseSignal.PROJECT_NOT_FOUND.value})
+        return JSONResponse(status_code=404, content={"signal": ResponseSignal.PROJECT_NOT_FOUND.signal, "message": ResponseSignal.PROJECT_NOT_FOUND.message})
 
     return JSONResponse(
         status_code=200,
@@ -174,7 +174,7 @@ async def ask_project(
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
-            "signal": ResponseSignal.NLP_CHAT_SUCCESSFUL.value,
+            "signal": ResponseSignal.NLP_CHAT_SUCCESSFUL.signal, "message": ResponseSignal.NLP_CHAT_SUCCESSFUL.message,
             "response": response,
             "chat_history": history,
         },

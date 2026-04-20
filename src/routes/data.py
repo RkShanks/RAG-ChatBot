@@ -67,7 +67,7 @@ async def upload_data(
     # 6. Return Success
     return JSONResponse(
         content={
-            "signal": ResponseSignal.FILE_UPLOADED_SUCCESSFULLY.value,
+            "signal": ResponseSignal.FILE_UPLOADED_SUCCESSFULLY.signal, "message": ResponseSignal.FILE_UPLOADED_SUCCESSFULLY.message,
             "file_id": str(asset_record.id),
         },
     )
@@ -132,7 +132,7 @@ async def get_project_files(
     project_model = ProjectModel(db_client=request.app.state.db_client)
     project = await project_model.get_project(project_id=project_id, session_id=session_id)
     if not project:
-        return JSONResponse(status_code=404, content={"signal": ResponseSignal.PROJECT_NOT_FOUND.value})
+        return JSONResponse(status_code=404, content={"signal": ResponseSignal.PROJECT_NOT_FOUND.signal, "message": ResponseSignal.PROJECT_NOT_FOUND.message})
 
     asset_model = AssetModel(db_client=request.app.state.db_client)
     assets = await asset_model.get_all_project_assets(
@@ -163,7 +163,7 @@ async def delete_project(
     if not project:
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,
-            content={"signal": ResponseSignal.PROJECT_NOT_FOUND.value}
+            content={"signal": ResponseSignal.PROJECT_NOT_FOUND.signal, "message": ResponseSignal.PROJECT_NOT_FOUND.message}
         )
 
     # 2. Delete Qdrant Vector Collection Physically
@@ -191,7 +191,7 @@ async def delete_project(
     logger.info(f"Successfully eradicated project '{project_id}' and all associated physical data.")
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content={"signal": ResponseSignal.PROJECT_DELETED_SUCCESSFULLY.value}
+        content={"signal": ResponseSignal.PROJECT_DELETED_SUCCESSFULLY.signal, "message": ResponseSignal.PROJECT_DELETED_SUCCESSFULLY.message}
     )
 
 @data_router.delete("/project/{project_id}/file/{file_id}")
@@ -210,7 +210,7 @@ async def delete_project_file(
     if not project:
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,
-            content={"signal": ResponseSignal.PROJECT_NOT_FOUND.value}
+            content={"signal": ResponseSignal.PROJECT_NOT_FOUND.signal, "message": ResponseSignal.PROJECT_NOT_FOUND.message}
         )
 
     # 2. Retrieve the Specific Asset from MongoDB
@@ -219,7 +219,7 @@ async def delete_project_file(
     if not asset or str(asset.asset_project_id) != str(project.id):
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,
-            content={"signal": ResponseSignal.FILE_NOT_FOUND.value}
+            content={"signal": ResponseSignal.FILE_NOT_FOUND.signal, "message": ResponseSignal.FILE_NOT_FOUND.message}
         )
 
     # 3. Delete VectorDB Data Associated with the File
@@ -241,7 +241,7 @@ async def delete_project_file(
     logger.info(f"Successfully eradicated file '{file_id}' and all associated physical data.")
     return JSONResponse(
         status_code=status.HTTP_200_OK,
-        content={"signal": ResponseSignal.FILE_DELETED_SUCCESSFULLY.value}
+        content={"signal": ResponseSignal.FILE_DELETED_SUCCESSFULLY.signal, "message": ResponseSignal.FILE_DELETED_SUCCESSFULLY.message}
     )
 
 

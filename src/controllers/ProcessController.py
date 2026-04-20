@@ -239,7 +239,7 @@ class ProcessController(BaseController):
             return {
                 "status": status.HTTP_500_INTERNAL_SERVER_ERROR,
                 "content": {
-                    "signal": ResponseSignal.COLLECTION_CREATION_FAILED.value,
+                    "signal": ResponseSignal.COLLECTION_CREATION_FAILED.signal, "message": ResponseSignal.COLLECTION_CREATION_FAILED.message,
                     "detail": e.dev_detail,
                 },
             }
@@ -250,13 +250,13 @@ class ProcessController(BaseController):
             if not project_assets:
                 return {
                     "status": status.HTTP_404_NOT_FOUND,
-                    "content": {"signal": ResponseSignal.FILE_NOT_FOUND.value},
+                    "content": {"signal": ResponseSignal.FILE_NOT_FOUND.signal, "message": ResponseSignal.FILE_NOT_FOUND.message},
                 }
         except CustomAPIException as e:
             return {
                 "status": status.HTTP_500_INTERNAL_SERVER_ERROR,
                 "content": {
-                    "signal": ResponseSignal.ASSET_RETRIEVAL_FAILED.value,
+                    "signal": ResponseSignal.ASSET_RETRIEVAL_FAILED.signal, "message": ResponseSignal.ASSET_RETRIEVAL_FAILED.message,
                     "detail": e.dev_detail,
                 },
             }
@@ -323,9 +323,8 @@ class ProcessController(BaseController):
         return {
             "status": status.HTTP_200_OK,
             "content": {
-                "signal": ResponseSignal.CHUNK_INSERTION_SUCCESSFUL.value
-                if not failed_files
-                else ResponseSignal.CHUNK_INSERTION_FAILED.value,
+                "signal": ResponseSignal.CHUNK_INSERTION_SUCCESSFUL.signal if not failed_files else ResponseSignal.CHUNK_INSERTION_FAILED.signal,
+                "message": ResponseSignal.CHUNK_INSERTION_SUCCESSFUL.message if not failed_files else ResponseSignal.CHUNK_INSERTION_FAILED.message,
                 "inserted": total_inserted_count,
                 "processed_files": len(project_assets) - len(failed_files),
                 "failed_files": failed_files,
@@ -342,7 +341,7 @@ class ProcessController(BaseController):
             return {
                 "status": status.HTTP_200_OK,
                 "content": {
-                    "signal": ResponseSignal.COLLECTION_INFO_SUCCESSFUL.value,
+                    "signal": ResponseSignal.COLLECTION_INFO_SUCCESSFUL.signal, "message": ResponseSignal.COLLECTION_INFO_SUCCESSFUL.message,
                     "info": info,
                 },
             }
@@ -350,7 +349,7 @@ class ProcessController(BaseController):
             return {
                 "status": status.HTTP_500_INTERNAL_SERVER_ERROR,
                 "content": {
-                    "signal": ResponseSignal.COLLECTION_INFO_FAILED.value,
+                    "signal": ResponseSignal.COLLECTION_INFO_FAILED.signal, "message": ResponseSignal.COLLECTION_INFO_FAILED.message,
                     "detail": e.dev_detail,
                 },
             }

@@ -26,12 +26,18 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+export type ToastData = {
+  message: string;
+  req_id?: string;
+  signal?: string;
+};
+
 // ─── Global Error Toast Bridge ───
 // A simple callback pattern to bridge axios (non-React) with the React Toast system.
 // ToastProvider registers itself here on mount.
-let _globalErrorHandler: ((message: string) => void) | null = null;
+let _globalErrorHandler: ((data: ToastData) => void) | null = null;
 
-export function registerGlobalErrorHandler(handler: (message: string) => void) {
+export function registerGlobalErrorHandler(handler: (data: ToastData) => void) {
   _globalErrorHandler = handler;
 }
 
@@ -47,20 +53,33 @@ export function unregisterGlobalErrorHandler() {
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    // DEBUG: trace every error that flows through axios
-    console.error('[API Interceptor] Error caught:', error.response?.status, error.response?.data);
-    console.error('[API Interceptor] Handler registered?', !!_globalErrorHandler);
-    
+    // 1. Handle complete network failures or dead backend connections.
+    // If the server crashed entirely (e.g., MongoDB disconnection preventing Uvicorn from binding),
+    // there won't be an error.response at all.
+    if (!error.response) {
+      if (_globalErrorHandler) {
+        _globalErrorHandler({ 
+          message: "Could not connect to the API server. Ensure the backend is running and the database is online.", 
+          signal: "server_offline" 
+        });
+      }
+      return Promise.reject(error);
+    }
+
+    // 2. Specifically suppress 404 errors from triggering global toasts.
+    // Component-level try/catches will handle 404s gracefully (e.g., empty chat history).
+    if (error.response?.status === 404) {
+      return Promise.reject(error);
+    }
+
     if (error.response?.data) {
       const data = error.response.data;
       const errorMessage = data.message || data.dev_detail || data.detail || 'An unexpected error occurred.';
-      
-      console.error('[API Interceptor] Will show toast:', errorMessage);
+      const req_id = data.request_id;
+      const signal = Array.isArray(data.signal) ? data.signal[0] : data.signal;
       
       if (_globalErrorHandler) {
-        _globalErrorHandler(errorMessage);
-      } else {
-        console.error('[API Interceptor] ⚠️ No handler registered! Toast cannot fire.');
+        _globalErrorHandler({ message: errorMessage, req_id, signal });
       }
     }
     // Always re-throw so individual catch blocks still work if needed
