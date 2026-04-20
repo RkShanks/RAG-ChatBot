@@ -38,7 +38,7 @@ async def wiki_search(
     if page is None:
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,
-            content={"search_status": ResponseSignal.WIKI_SEARCH_NO_RESULTS.value},
+            content={"search_status": ResponseSignal.WIKI_SEARCH_NO_RESULTS.signal, "message": ResponseSignal.WIKI_SEARCH_NO_RESULTS.message},
         )
 
     # 3. Convert page to UploadFile
@@ -70,8 +70,9 @@ async def wiki_search(
     # 6. Return Success
     return JSONResponse(
         content={
-            "search_status": ResponseSignal.WIKI_SEARCH_RESULTS_FOUND.value,
-            "signal": ResponseSignal.WIKI_FILE_UPLOADED_SUCCESSFULLY.value,
+            "search_status": ResponseSignal.WIKI_SEARCH_RESULTS_FOUND.signal,
+            "signal": ResponseSignal.WIKI_FILE_UPLOADED_SUCCESSFULLY.signal,
+            "message": ResponseSignal.WIKI_FILE_UPLOADED_SUCCESSFULLY.message,
             "file_id": str(asset_record.id),
         }
     )

@@ -2,18 +2,25 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Bot, User, Sparkles } from "lucide-react";
+import { Send, Bot, Sparkles } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { apiClient, getSessionId } from "../lib/api";
 import { useErrorToast } from "../lib/ToastContext";
+import type { UserProfile } from "./SettingsPanel";
 
 type Message = {
   role: "system" | "user" | "error";
   text: string;
 };
 
-export function ChatBox({ activeProjectId }: { activeProjectId: string }) {
+export function ChatBox({
+  activeProjectId,
+  userProfile,
+}: {
+  activeProjectId: string;
+  userProfile: UserProfile | null;
+}) {
   const [messages, setMessages] = useState<Message[]>([
     { 
       role: "system", 
@@ -86,6 +93,23 @@ export function ChatBox({ activeProjectId }: { activeProjectId: string }) {
         body: JSON.stringify({ query: userText, limit: 5 })
       });
 
+      // Handle non-OK HTTP responses (project not found, no files, validation errors)
+      if (!response.ok) {
+        let errorMsg = "Something went wrong. Please try again.";
+        try {
+          const errData = await response.json();
+          // Use the user-facing message from ResponseEnums if available
+          errorMsg = errData.message || errData.dev_detail || errData.detail || errorMsg;
+        } catch {
+          // Response wasn't JSON, use status text
+          errorMsg = `Server error (${response.status}): ${response.statusText}`;
+        }
+        setIsTyping(false);
+        setMessages(prev => [...prev, { role: "error", text: `**Error:** ${errorMsg}` }]);
+        scrollToBottom();
+        return;
+      }
+
       if (!response.body) throw new Error("ReadableStream not supported in this browser.");
 
       const reader = response.body.getReader();
@@ -131,13 +155,10 @@ export function ChatBox({ activeProjectId }: { activeProjectId: string }) {
                 });
                 scrollToBottom();
               } else if (data.type === "error") {
-                // Render custom Error Exception signal safely out of the RAG context
-                setMessages(prev => {
-                  const newArr = [...prev];
-                  newArr[newArr.length - 1].role = "error";
-                  newArr[newArr.length - 1].text = `**Vector Search Exception:** ${data.text}`;
-                  return newArr;
-                });
+                // Render custom Error Exception signal safely in a dedicated error bubble
+                setIsTyping(false);
+                setMessages(prev => [...prev, { role: "error", text: `**Vector Search Exception:** ${data.text}` }]);
+                scrollToBottom();
               }
             } catch(e) {
               console.warn("Failed to parse SSE data chunk", e);
@@ -154,6 +175,17 @@ export function ChatBox({ activeProjectId }: { activeProjectId: string }) {
     }
   };
 
+  // Avatar helpers
+  const getInitials = (name: string) => {
+    if (!name || !name.trim()) return "?";
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return parts[0][0].toUpperCase();
+  };
+
+  const displayName = userProfile?.display_name || "";
+  const avatarColor = userProfile?.avatar_color || "hsl(220, 70%, 50%)";
+
   return (
     <div className="flex-1 flex flex-col h-full relative z-10">
       <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
@@ -166,11 +198,31 @@ export function ChatBox({ activeProjectId }: { activeProjectId: string }) {
               key={i}
               className={`flex gap-4 max-w-4xl mx-auto w-full ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}
             >
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 border mt-1 shadow-lg ${msg.role === "system" ? "bg-indigo-500/10 border-indigo-500/30" : msg.role === "error" ? "bg-red-500/10 border-red-500/30" : "bg-emerald-500/10 border-emerald-500/30"}`}>
-                {msg.role === "system" ? <Bot size={20} className="text-indigo-400" /> : msg.role === "error" ? <Bot size={20} className="text-red-400" /> : <User size={20} className="text-emerald-400" />}
-              </div>
+              {/* Avatar */}
+              {msg.role === "user" ? (
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 border mt-1 shadow-lg ring-1 ring-white/10 transition-all"
+                  style={{ backgroundColor: avatarColor }}
+                >
+                  <span className="text-sm font-bold text-white/90 select-none">
+                    {getInitials(displayName)}
+                  </span>
+                </div>
+              ) : (
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 border mt-1 shadow-lg ${msg.role === "error" ? "bg-red-500/10 border-red-500/30" : "bg-indigo-500/10 border-indigo-500/30"}`}>
+                  <Bot size={20} className={msg.role === "error" ? "text-red-400" : "text-indigo-400"} />
+                </div>
+              )}
               
               <div className={`flex flex-col max-w-[85%] ${msg.role === "user" ? "items-end" : "items-start"}`}>
+                {/* Display name label */}
+                {msg.role === "user" && displayName && (
+                  <span className="text-[10px] text-white/30 mb-1 mr-1 font-medium">{displayName}</span>
+                )}
+                {msg.role === "system" && i > 0 && (
+                  <span className="text-[10px] text-indigo-400/40 mb-1 ml-1 font-medium">Nimo</span>
+                )}
+
                 <div className={`
                   p-5 rounded-3xl glass shadow-xl
                   ${msg.role === "user" ? "bg-emerald-900/40 border-emerald-500/30 text-emerald-50 rounded-tr-[4px]" : 

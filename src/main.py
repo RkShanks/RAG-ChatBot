@@ -159,8 +159,8 @@ async def global_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
-            "signal": ResponseSignal.INTERNAL_SERVER_ERROR.value,
-            "message": ResponseSignal.INTERNAL_SERVER_ERROR_MESSAGE.value,
+            "signal": ResponseSignal.INTERNAL_SERVER_ERROR.signal,
+            "message": ResponseSignal.INTERNAL_SERVER_ERROR.message,
             # 2. Give the ID to the frontend so they can report it!
             "request_id": req_id,
             "dev_detail": str(exc),
@@ -212,8 +212,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={
-            "signal": ResponseSignal.VALIDATION_FAILED.value,
-            "message": ResponseSignal.VALIDATION_FAILED_MESSAGE.value,
+            "signal": ResponseSignal.VALIDATION_FAILED.signal,
+            "message": ResponseSignal.VALIDATION_FAILED.message,
             # 2. Give the ID to the frontend here too!
             "request_id": req_id,
             "details": simplified_errors,

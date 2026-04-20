@@ -20,6 +20,8 @@ import {
   Link,
   ChevronDown,
   XCircle,
+  User,
+  Pencil,
 } from "lucide-react";
 import { apiClient } from "../lib/api";
 
@@ -52,14 +54,24 @@ type MaskedKeys = {
   urls: Record<string, string>;
 };
 
+export type UserProfile = {
+  session_id: string;
+  display_name: string;
+  avatar_color: string;
+};
+
 export function SettingsPanel({
   isOpen,
   onClose,
   onResetComplete,
+  userProfile,
+  onProfileUpdate,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onResetComplete: () => void;
+  userProfile: UserProfile | null;
+  onProfileUpdate: (profile: UserProfile) => void;
 }) {
   const [info, setInfo] = useState<SystemInfo | null>(null);
   const [tuning, setTuning] = useState<TuningValues>({
@@ -82,6 +94,11 @@ export function SettingsPanel({
   // API Key state
   const [genApiKey, setGenApiKey] = useState("");
   const [embApiKey, setEmbApiKey] = useState("");
+
+  // Profile editing state
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   // UI state
   const [isSaving, setIsSaving] = useState(false);
@@ -122,6 +139,13 @@ export function SettingsPanel({
     fetchAllData();
   }, [isOpen]);
 
+  // Sync edit name with profile
+  useEffect(() => {
+    if (userProfile) {
+      setEditName(userProfile.display_name || "");
+    }
+  }, [userProfile]);
+
   // When generation backend changes, reset the model to first in list
   useEffect(() => {
     if (catalog && genBackend) {
@@ -142,6 +166,23 @@ export function SettingsPanel({
       setEmbCustomModel("");
     }
   }, [embBackend]);
+
+  const handleSaveDisplayName = async () => {
+    setIsSavingProfile(true);
+    try {
+      const res = await apiClient.put("/settings/profile", {
+        display_name: editName,
+      });
+      if (res.data?.profile) {
+        onProfileUpdate(res.data.profile);
+      }
+      setIsEditingName(false);
+    } catch (err) {
+      console.error("Failed to save display name", err);
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
 
   const handleApplyTuning = async () => {
     setIsSaving(true);
@@ -219,6 +260,17 @@ export function SettingsPanel({
   const embModels = catalog?.embedding_models[embBackend] || [];
   const providers = (catalog?.generation_providers || []).filter((p) => p !== "LOCAL");
 
+  // Avatar helpers
+  const getInitials = (name: string) => {
+    if (!name || !name.trim()) return "?";
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return parts[0][0].toUpperCase();
+  };
+
+  const displayName = userProfile?.display_name || "";
+  const avatarColor = userProfile?.avatar_color || "hsl(220, 70%, 50%)";
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -256,6 +308,82 @@ export function SettingsPanel({
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+              {/* ─── Section 0: User Profile ─── */}
+              <div>
+                <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                  <User size={10} /> User Profile
+                </h3>
+                <div className="flex items-center gap-4 p-4 rounded-xl border border-white/10 bg-white/[0.02]">
+                  {/* Avatar Circle */}
+                  <div
+                    className="w-14 h-14 rounded-full flex items-center justify-center shrink-0 shadow-lg ring-2 ring-white/10 transition-all"
+                    style={{ backgroundColor: avatarColor }}
+                  >
+                    <span className="text-lg font-bold text-white/90 select-none">
+                      {getInitials(displayName)}
+                    </span>
+                  </div>
+
+                  {/* Name + Edit */}
+                  <div className="flex-1 min-w-0">
+                    {isEditingName ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleSaveDisplayName();
+                            if (e.key === "Escape") {
+                              setIsEditingName(false);
+                              setEditName(displayName);
+                            }
+                          }}
+                          maxLength={50}
+                          autoFocus
+                          placeholder="Enter your name..."
+                          className="flex-1 bg-white/5 border border-indigo-500/30 rounded-lg px-3 py-1.5 text-sm text-white/90 outline-none focus:border-indigo-500/60 placeholder:text-white/20"
+                        />
+                        <motion.button
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          onClick={handleSaveDisplayName}
+                          disabled={isSavingProfile}
+                          className="p-1.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/30 transition-colors"
+                        >
+                          {isSavingProfile ? (
+                            <Loader2 size={14} className="text-indigo-400 animate-spin" />
+                          ) : (
+                            <Check size={14} className="text-indigo-400" />
+                          )}
+                        </motion.button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-white/85 truncate">
+                            {displayName || "Anonymous User"}
+                          </p>
+                          <p className="text-[10px] text-white/30 truncate mt-0.5">
+                            {userProfile?.session_id
+                              ? `Session: ${userProfile.session_id.substring(0, 8)}...`
+                              : "Loading..."}
+                          </p>
+                        </div>
+                        <motion.button
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          onClick={() => setIsEditingName(true)}
+                          className="p-1.5 rounded-lg hover:bg-white/10 transition-colors shrink-0"
+                        >
+                          <Pencil size={12} className="text-white/40" />
+                        </motion.button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               {/* ─── Section 1: System Info ─── */}
               <div>
                 <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-3">

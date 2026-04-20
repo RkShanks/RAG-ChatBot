@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from typing import Optional
@@ -8,7 +8,7 @@ from typing import Optional
 from controllers import BaseController
 from helpers.config import get_settings
 from helpers.dependencies import get_session_id
-from models import AssetModel, ChunkModel, ProjectModel
+from models import AssetModel, ChunkModel, ProjectModel, UserModel
 from services.llm.LLMEnums import LLMEnums, OPENAIEnum, CohereEnum, GeminiEnum
 from services.llm import LLMFactory
 
@@ -303,5 +303,42 @@ async def update_provider(request: Request, update: ProviderUpdate):
         content={
             "signal": "success",
             "active_providers": providers,
+        },
+    )
+
+
+@settings_router.get("/profile")
+async def get_profile(request: Request, session_id: str = Depends(get_session_id)):
+    """Returns the user profile for the current session, creating one if it doesn't exist."""
+    user_model = UserModel(db_client=request.app.state.db_client)
+    user = await user_model.get_or_create_user(session_id)
+    return JSONResponse(
+        status_code=200,
+        content={
+            "signal": "success",
+            "profile": user,
+        },
+    )
+
+
+@settings_router.put("/profile")
+async def update_profile(request: Request, session_id: str = Depends(get_session_id)):
+    """Updates the display name for the current user profile."""
+    body = await request.json()
+    display_name = body.get("display_name", "")
+
+    user_model = UserModel(db_client=request.app.state.db_client)
+    updated = await user_model.update_display_name(session_id, display_name)
+
+    if updated:
+        logger.info(f"✅ Profile updated for session {session_id[:8]}...")
+
+    # Return the updated profile
+    user = await user_model.get_or_create_user(session_id)
+    return JSONResponse(
+        status_code=200,
+        content={
+            "signal": "success",
+            "profile": user,
         },
     )

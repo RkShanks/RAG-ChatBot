@@ -33,7 +33,7 @@ async def welcome(request: Request, app_settings: Settings = Depends(get_setting
 async def check_db_connection(db_client):
     try:
         await db_client.command("ping")
-        return ResponseSignal.DB_CONNECTION_SUCCESS.value
+        return ResponseSignal.DB_CONNECTION_SUCCESS.signal
 
     except Exception as e:
         raise CustomAPIException(
