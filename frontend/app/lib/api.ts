@@ -86,3 +86,8 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// ─── API Methods ───
+export const deleteLastInteraction = async (projectId: string) => {
+  return await apiClient.delete(`/nlp/history/${projectId}/last`);
+};

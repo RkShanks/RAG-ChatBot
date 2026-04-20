@@ -250,6 +250,7 @@ export default function Home() {
         onSwitchProject={handleSwitchProject}
         onDeleteProject={handleDeleteProject}
         onToggleSettings={() => setIsSettingsOpen(true)}
+        userProfile={userProfile}
       />
       <ChatBox
         key={chatResetKey}
