@@ -147,3 +147,23 @@ class ProjectModel(BaseDataModel):
         projects = [Project.model_validate(doc) for doc in raw_documents]
 
         return projects, total_pages
+
+    async def pop_last_interaction(self, project_id: str, session_id: str) -> bool:
+        """Removes the last prompt/response pair from chat history (for Regenerate feature)."""
+        logger.debug(f"Popping last interaction for project {project_id} (Regenerate)")
+        project = await self.get_project(project_id, session_id)
+        if not project or not project.chat_history:
+            return False
+            
+        history = project.chat_history
+        if len(history) >= 2:
+            # We enforce pairs, so dropping the last 2 items deletes the last User+Assistant pair
+            project.chat_history = history[:-2]
+            await self.update_project(project)
+            return True
+        elif len(history) == 1:
+            project.chat_history = []
+            await self.update_project(project)
+            return True
+            
+        return False

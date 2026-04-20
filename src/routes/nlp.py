@@ -143,6 +143,23 @@ async def get_chat_history(
         content={"signal": "success", "history": project.chat_history,}
     )
 
+@nlp_router.delete("/history/{project_id}/last")
+async def delete_last_interaction(
+    request: Request,
+    project_id: str,
+    session_id: str = Depends(get_session_id),
+):
+    from models import ProjectModel
+    project_model = ProjectModel(db_client=request.app.state.db_client)
+    success = await project_model.pop_last_interaction(project_id, session_id)
+    if not success:
+        return JSONResponse(status_code=400, content={"signal": "interaction_pop_failed", "message": "Failed to pop interaction. History might be empty."})
+        
+    return JSONResponse(
+        status_code=200,
+        content={"signal": "interaction_popped_successfully", "message": "Last interaction pair removed from history.",}
+    )
+
 @nlp_router.post("/ask/generate/{project_id}")
 async def ask_project(
     request: Request,

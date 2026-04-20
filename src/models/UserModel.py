@@ -45,6 +45,20 @@ class UserModel:
         )
         return result.modified_count > 0
 
+    async def update_avatar(self, session_id: str, avatar_base64: str) -> bool:
+        """Update the avatar image explicitly for a given session mapping."""
+        # Optional validation can be done in the route to ensure it's < 100kb
+        result = await self.collection.update_one(
+            {"session_id": session_id},
+            {"$set": {"avatar_base64": avatar_base64}},
+        )
+        return result.modified_count > 0
+
+    async def delete_user(self, session_id: str) -> bool:
+        """Purge a user entirely from the collection (Nuclear Reset usage)."""
+        result = await self.collection.delete_one({"session_id": session_id})
+        return result.deleted_count > 0
+
     @staticmethod
     def _generate_color(session_id: str) -> str:
         """Deterministic HSL color from session_id hash."""

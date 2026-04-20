@@ -160,6 +160,13 @@ async def nuclear_reset(
         except Exception as e:
             logger.warning(f"Failed to fully destroy project {project.project_id}: {e}")
 
+    # 5. Delete Session User Profile (removes custom avatar, display name, completely wipes identity to default)
+    try:
+        user_model = UserModel(db_client=request.app.state.db_client)
+        await user_model.delete_user(session_id=session_id)
+    except Exception as e:
+        logger.error(f"Failed to destroy user mapping for {session_id}: {e}")
+
     logger.info(f"🔥 Nuclear Reset complete: {destroyed_count} workspaces destroyed for session {session_id}")
 
     return JSONResponse(
@@ -323,15 +330,20 @@ async def get_profile(request: Request, session_id: str = Depends(get_session_id
 
 @settings_router.put("/profile")
 async def update_profile(request: Request, session_id: str = Depends(get_session_id)):
-    """Updates the display name for the current user profile."""
+    """Updates the display name and/or avatar for the current user profile."""
     body = await request.json()
-    display_name = body.get("display_name", "")
+    display_name = body.get("display_name")
+    avatar_base64 = body.get("avatar_base64")
 
     user_model = UserModel(db_client=request.app.state.db_client)
-    updated = await user_model.update_display_name(session_id, display_name)
+    
+    if display_name is not None:
+        await user_model.update_display_name(session_id, display_name)
+    
+    if avatar_base64 is not None:
+        await user_model.update_avatar(session_id, avatar_base64)
 
-    if updated:
-        logger.info(f"✅ Profile updated for session {session_id[:8]}...")
+    logger.info(f"✅ Profile updated for session {session_id[:8]}...")
 
     # Return the updated profile
     user = await user_model.get_or_create_user(session_id)
