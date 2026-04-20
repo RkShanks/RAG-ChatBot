@@ -110,7 +110,7 @@ async def chat_with_project(
         except CustomAPIException as e:
             # SSE Error Handling: We catch our clean custom exception and send it as an SSE error event
             # so the frontend UI can display the precise dev_detail without breaking the chat window!
-            error_payload = {"type": "error", "text": e.dev_detail, "signal": e.signal_enum.value}
+            error_payload = {"type": "error", "text": e.message or e.dev_detail, "signal": e.signal}
             safe_data = json.dumps(error_payload, ensure_ascii=False)
             yield f"data: {safe_data}\n\n"
 

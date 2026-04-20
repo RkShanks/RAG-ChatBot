@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { ChatBox } from "./components/ChatBox";
 import { SettingsPanel } from "./components/SettingsPanel";
+import type { UserProfile } from "./components/SettingsPanel";
 import { apiClient } from "./lib/api";
 import { useErrorToast } from "./lib/ToastContext";
 import { motion, AnimatePresence } from "framer-motion";
@@ -19,7 +20,20 @@ export default function Home() {
   const [isDragging, setIsDragging] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [chatResetKey, setChatResetKey] = useState(0);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const { triggerToast } = useErrorToast();
+
+  // ─── Fetch user profile on mount ───
+  const fetchProfile = useCallback(async () => {
+    try {
+      const res = await apiClient.get("/settings/profile");
+      if (res.data?.profile) {
+        setUserProfile(res.data.profile);
+      }
+    } catch (err) {
+      console.warn("Could not fetch user profile.", err);
+    }
+  }, []);
 
   // ─── Fetch all workspaces from the database ───
   const refreshProjects = useCallback(async () => {
@@ -39,12 +53,25 @@ export default function Home() {
     return [];
   }, []);
 
+  // ─── Create a new workspace and return its ID ───
+  const createNewWorkspace = useCallback(() => {
+    const newId = "workspace" + Date.now().toString(36);
+    setActiveProjectId(newId);
+    setFiles([]);
+    return newId;
+  }, []);
+
   // ─── Initial hydration ───
   useEffect(() => {
     const hydrate = async () => {
+      // Fetch profile and projects in parallel
+      await fetchProfile();
       const fetched = await refreshProjects();
       if (fetched.length > 0 && !activeProjectId) {
         setActiveProjectId(fetched[0].id);
+      } else if (fetched.length === 0) {
+        // Auto-create a workspace so the user can immediately drag-and-drop
+        createNewWorkspace();
       }
     };
     hydrate();
@@ -71,15 +98,6 @@ export default function Home() {
     fetchExistingFiles();
   }, [activeProjectId]);
 
-  // ─── Create a new workspace ───
-  const handleNewProject = () => {
-    // Generate a clean alphanumeric ID
-    const newId = "workspace" + Date.now().toString(36);
-    setActiveProjectId(newId);
-    setFiles([]);
-    // The project will be physically created in MongoDB on first file upload
-  };
-
   // ─── Switch workspace ───
   const handleSwitchProject = (projectId: string) => {
     if (projectId === activeProjectId) return;
@@ -103,11 +121,11 @@ export default function Home() {
         if (updated.length > 0) {
           setActiveProjectId(updated[0].id);
         } else {
-          handleNewProject();
+          createNewWorkspace();
         }
       }
-    } catch (e: any) {
-      triggerToast(e.response?.data?.dev_detail || "Failed to delete workspace.");
+    } catch {
+      // HTTP errors auto-surface via global axios interceptor
     }
   };
 
@@ -124,17 +142,31 @@ export default function Home() {
       });
       const newFileId = uploadRes.data.file_id;
 
-      await apiClient.post(`/data/process/${activeProjectId}`, { 
+      const processRes = await apiClient.post(`/data/process/${activeProjectId}`, { 
         file_id: newFileId, 
         do_reset: false 
       });
+
+      // Check for pipeline-level failures (Docling chunking, embedding, etc.)
+      // These return 200 OK with failure info buried in the response body,
+      // so the global interceptor won't catch them — we must check manually.
+      const processData = processRes.data;
+      if (processData?.failed_files && processData.failed_files.length > 0) {
+        const failedNames = processData.failed_files.join(", ");
+        triggerToast(`⚠️ Ingestion partially failed for: ${failedNames}. The file was uploaded but could not be fully processed into vectors.`);
+      }
+      if (processData?.signal === "chunk_insertion_failed" && (!processData.failed_files || processData.failed_files.length === 0)) {
+        triggerToast("⚠️ Vector ingestion failed. The document could not be processed. Check backend logs for details.");
+      }
 
       setFiles(prev => [...prev, { id: newFileId, name: file.name }]);
 
       // Refresh projects to catch auto-naming from backend
       await refreshProjects();
-    } catch (error: any) {
-      triggerToast(error.response?.data?.dev_detail || "Vector upload pipeline crushed.");
+    } catch {
+      // HTTP errors (415 unsupported type, 500 server error, etc.) are handled
+      // automatically by the global axios interceptor → toast auto-fires.
+      // We only need to stop the loading spinner here.
     } finally {
       setIsUploading(false);
     }
@@ -167,8 +199,8 @@ export default function Home() {
     try {
       await apiClient.delete(`/data/project/${activeProjectId}/file/${fileId}`);
       setFiles(prev => prev.filter(f => f.id !== fileId));
-    } catch (e: any) {
-      triggerToast(e.response?.data?.dev_detail || "File deletion failed.");
+    } catch {
+      // HTTP errors auto-surface via global axios interceptor
     }
   };
 
@@ -214,15 +246,21 @@ export default function Home() {
         isUploading={isUploading}
         onFileUpload={handleFileUpload}
         onDeleteFile={handleDeleteFile}
-        onNewProject={handleNewProject}
+        onNewProject={createNewWorkspace}
         onSwitchProject={handleSwitchProject}
         onDeleteProject={handleDeleteProject}
         onToggleSettings={() => setIsSettingsOpen(true)}
       />
-      <ChatBox key={chatResetKey} activeProjectId={activeProjectId || ""} />
+      <ChatBox
+        key={chatResetKey}
+        activeProjectId={activeProjectId || ""}
+        userProfile={userProfile}
+      />
       <SettingsPanel
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+        userProfile={userProfile}
+        onProfileUpdate={(profile) => setUserProfile(profile)}
         onResetComplete={async () => {
           const updated = await refreshProjects();
           if (updated.length > 0) {
