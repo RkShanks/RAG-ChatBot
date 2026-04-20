@@ -9,9 +9,7 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { apiClient, getSessionId, deleteLastInteraction } from "../lib/api";
 import { useErrorToast } from "../lib/ToastContext";
-import type { UserProfile } from "./SettingsPanel";
-
-function CopyButton({ text }: { text: string }) {
+import type { UserProfile } from "./SettingsPanel";function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   const handleCopy = async () => {
     await navigator.clipboard.writeText(text);
@@ -58,7 +56,12 @@ export function ChatBox({
   activeProjectId: string;
   userProfile: UserProfile | null;
 }) {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>([
+    { 
+      role: "system", 
+      text: "Hello! I am **Nimo**. I have access to your uploaded corporate documentation via strict _Hybrid Vector Search_ constraints.\n\n### How can I assist you today?\n- **Summarize** a loaded file.\n- **Extract** key numerical data.\n- **Search** for precise institutional knowledge."
+    }
+  ]);
   const [inputTitle, setInputTitle] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const { triggerToast } = useErrorToast();
@@ -201,6 +204,7 @@ export function ChatBox({
       setIsTyping(false);
     }
   };
+
 
   const handleSend = () => {
     handleSendMessage(inputTitle);
