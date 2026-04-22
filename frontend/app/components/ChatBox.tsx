@@ -188,6 +188,7 @@ export function ChatBox({
           errorMsg = `Server error (${response.status}): ${response.statusText}`;
         }
         setIsTyping(false);
+        triggerToast(errorMsg);
         setMessages(prev => [...prev, { role: "error", text: `**Error:** ${errorMsg}` }]);
         scrollToBottom();
         return;
