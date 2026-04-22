@@ -17,6 +17,7 @@ from routes.documents import documents_router
 from services.llm import LLMFactory
 from services.ranker import RankerFactory
 from services.vectordb import VectorDBFactory
+from prometheus_fastapi_instrumentator import Instrumentator
 
 # Set up the logger
 setup_logging()
@@ -228,3 +229,5 @@ app.include_router(wiki_search.wiki_search_router)
 app.include_router(nlp.nlp_router)
 app.include_router(settings.settings_router)
 app.include_router(documents_router)
+
+Instrumentator().instrument(app).expose(app)
