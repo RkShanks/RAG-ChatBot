@@ -1,0 +1,31 @@
+apiVersion: 1
+contactPoints:
+  - orgId: 1
+    name: Telegram
+    receivers:
+      - uid: telegram-receiver
+        type: telegram
+        settings:
+          bottoken: ${TELEGRAM_BOT_TOKEN}
+          chatid: ${TELEGRAM_CHAT_ID}
+          message: |
+            🚨 RAG Chatbot Alert
+            {{ .CommonAnnotations.summary }}
+            {{ .CommonAnnotations.description }}
+
+  - orgId: 1
+    name: Gmail
+    receivers:
+      - uid: gmail-receiver
+        type: email
+        settings:
+          addresses: ${ALERT_EMAIL}
+          subject: "🚨 RAG Alert: {{ .CommonLabels.alertname }}"
+
+policies:
+  - orgId: 1
+    receiver: Telegram
+    routes:
+      - receiver: Gmail
+        matchers:
+          - severity = critical
