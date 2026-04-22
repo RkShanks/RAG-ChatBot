@@ -28,7 +28,7 @@ def get_log_config():
                 "datefmt": "%Y-%m-%d %H:%M:%S",
             },
             "production_formatter": {
-                "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
+                "()": "pythonjsonlogger.JsonFormatter",
                 "fmt": "%(asctime)s %(correlation_id)s %(levelname)s %(name)s %(message)s %(filename)s %(lineno)d",
             },
         },
@@ -74,6 +74,21 @@ def get_log_config():
                 "propagate": False,
             },
             "httpcore": {
+                "handlers": ["console"],
+                "level": "WARNING",
+                "propagate": False,
+            },
+            "qdrant_client": {
+                "handlers": ["console"],
+                "level": "WARNING",
+                "propagate": False,
+            },
+            "httpx": {
+                "handlers": ["console"],
+                "level": "WARNING",
+                "propagate": False,
+            },
+            "uvicorn.access": {
                 "handlers": ["console"],
                 "level": "WARNING",
                 "propagate": False,
