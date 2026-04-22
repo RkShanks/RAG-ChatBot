@@ -272,13 +272,102 @@ The result: any exception thrown anywhere in the backend automatically surfaces 
 
 ## Observability
 
-Once deployed, the stack provides full production-grade observability:
+The stack runs a full three-layer monitoring pipeline:
 
-- **Prometheus** scrapes `/metrics` from the FastAPI backend every 15 seconds — request count, latency histograms (P50/P95/P99), error rates, all broken down by endpoint
-- **Loki** collects structured JSON logs from the backend container via the Docker logging driver
-- **Grafana** auto-provisions Loki and Prometheus as datasources and fires alerts to **Telegram** and **Gmail** when:
-  - Error rate spikes above threshold for 2 minutes
-  - No logs received from the backend for 1 minute (service down)
+- **Prometheus** scrapes `/metrics` from the FastAPI backend every 15 seconds — request count, latency histograms (P50/P95/P99), error rates, broken down by endpoint
+- **Loki** collects structured JSON logs from the backend container via the Loki Docker logging driver *(production only — disabled locally)*
+- **Grafana** auto-provisions both datasources and fires alerts to **Telegram** and **Gmail** when error rate spikes or the backend goes silent *(production only)*
+
+---
+
+## Grafana Dashboards
+
+Grafana starts with datasources pre-configured but no dashboards — import them manually via the UI.
+
+### How to Import (Local or Production)
+
+1. Open Grafana → **http://localhost:3001** (local) or **https://your-domain:3001** (Oracle Cloud)
+2. Log in: `admin` / your `GRAFANA_ADMIN_PASSWORD`
+3. Go to **Dashboards → New → Import**
+4. Enter the dashboard ID → **Load** → select the correct datasource → **Import**
+
+---
+
+### ✅ Works Locally + Production
+
+| Dashboard | ID | Datasource | What you see |
+|---|---|---|---|
+| [FastAPI Observability](https://grafana.com/grafana/dashboards/16110) | `16110` | Prometheus | Request rate, latency P50/P95/P99, error rate, per-endpoint breakdown |
+| [Prometheus Stats](https://grafana.com/grafana/dashboards/11074) | `11074` | Prometheus | Prometheus internals — scrape health, target status, memory usage |
+
+> These work locally because Prometheus **is** running and scraping the backend's `/metrics`.
+> Import these first — they'll have live data immediately after the backend starts.
+
+---
+
+### 🚀 Production Only (Oracle Cloud)
+
+| Dashboard | ID | Datasource | What you see | Extra Requirement |
+|---|---|---|---|---|
+| [Loki Logs / App](https://grafana.com/grafana/dashboards/15141) | `15141` | Loki | Live backend log stream with label filtering | Loki Docker plugin on VM |
+| [Node Exporter Full](https://grafana.com/grafana/dashboards/1860) | `1860` | Prometheus | VM CPU, RAM, disk I/O, network | Add `node-exporter` service |
+| [Docker Containers](https://grafana.com/grafana/dashboards/11467) | `11467` | Prometheus | Per-container CPU/RAM/network stats | Add `cadvisor` service |
+
+> **Loki dashboards** require the [Loki Docker logging plugin](https://grafana.com/docs/loki/latest/send-data/docker-driver/)
+> installed on the Oracle VM. Without it, no logs flow to Loki and dashboards will be empty.
+> See [DEPLOYMENT.md](./DEPLOYMENT.md) Step 3 for plugin installation.
+
+---
+
+### Adding Node Exporter (Oracle Cloud — VM-level metrics)
+
+To enable dashboard `1860`, add to `docker-compose.yml`:
+
+```yaml
+node-exporter:
+  image: prom/node-exporter:latest
+  pid: host
+  volumes:
+    - /proc:/host/proc:ro
+    - /sys:/host/sys:ro
+    - /:/rootfs:ro
+  command:
+    - '--path.procfs=/host/proc'
+    - '--path.sysfs=/host/sys'
+    - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+  networks:
+    - observability
+```
+
+Add a scrape target to `config/prometheus.yml`:
+
+```yaml
+- job_name: node-exporter
+  static_configs:
+    - targets: ['node-exporter:9100']
+```
+
+> Not included by default — requires `pid: host` and access to host filesystem mounts,
+> which only makes sense on a real Linux VM. Do not add it for local testing.
+
+---
+
+### Loki Log Explorer (Production — no dashboard ID needed)
+
+Use **Grafana Explore** to query backend logs directly:
+
+1. Click **Explore** (compass icon) → select **Loki** datasource
+2. Useful queries:
+
+```logql
+{service="backend"}                              # all backend logs
+{service="backend"} |= "ERROR"                  # errors only
+{service="backend"} | json | level="ERROR"       # structured error filter
+{service="backend"} | json | request_id="<id>"  # trace a specific request
+```
+
+> The `request_id` in the last query matches the ID shown in error toasts in the frontend UI —
+> this creates a direct link from a user-reported error to the exact log line in the backend.
 
 ---
 
