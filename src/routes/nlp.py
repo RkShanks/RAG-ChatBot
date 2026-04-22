@@ -113,9 +113,9 @@ async def chat_with_project(
                     # Strip the random prefix (everything before the first underscore)
                     display_name = basename.split("_", 1)[1] if "_" in basename else basename
 
-                    # page_number is 0-indexed in chunks — convert to 1-indexed for display
-                    raw_page = r.metadata.get("page_number")
-                    page = (raw_page + 1) if isinstance(raw_page, int) and raw_page >= 0 else "N/A"
+                    # page_number is 1-indexed (Docling native); 0 means prov was absent
+                    raw_page = r.metadata.get("page_number", 0)
+                    page = raw_page if raw_page > 0 else "N/A"
 
                     source_data.append({
                         "document": display_name,
