@@ -1,0 +1,30 @@
+# docker-compose.local.yml
+# ─────────────────────────────────────────────────────────
+# Local testing override — runs the full stack on your machine
+# without SSL, Certbot, or the Loki Docker logging plugin.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml up --build
+# ─────────────────────────────────────────────────────────
+
+services:
+
+  # Override backend: skip the Loki Docker logging driver
+  # (requires a plugin not installed on dev machines)
+  backend:
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Override nginx: use HTTP-only local config (no SSL certs needed)
+  nginx:
+    volumes:
+      - ./config/nginx-local.conf:/etc/nginx/conf.d/default.conf
+    ports:
+      - "80:80"
+
+  # Override certbot: no-op (no real domain locally)
+  certbot:
+    entrypoint: echo "Certbot skipped in local mode"
