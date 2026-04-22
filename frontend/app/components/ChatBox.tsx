@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Bot, Sparkles, Check, Copy, RefreshCw, MessageSquare } from "lucide-react";
+import { Send, Bot, Sparkles, Check, Copy, RefreshCw, MessageSquare, BookOpen, ChevronDown } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -44,10 +44,61 @@ function MessageActions({ content, role, onRegenerate, isLast }: { content: stri
   );
 }
 
+type Source = {
+  document: string;
+  page: string | number;
+  score: number;
+  text: string;
+};
+
 type Message = {
   role: "system" | "user" | "error";
   text: string;
+  sources?: Source[];
 };
+
+function SourceCitations({ sources }: { sources: Source[] }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="mt-3 border-t border-white/10 pt-2">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="text-[10px] text-indigo-400/60 hover:text-indigo-400 flex items-center gap-1.5 transition-colors"
+      >
+        <BookOpen size={10} />
+        {sources.length} source{sources.length !== 1 ? 's' : ''} used
+        <ChevronDown size={10} className={`transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
+      </button>
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="mt-2 space-y-1.5">
+              {sources.map((s, i) => (
+                <div key={i} className="p-2 bg-white/5 rounded-lg border border-white/10">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-medium text-white/60 truncate">
+                      [{i + 1}] {s.document} — p.{s.page}
+                    </span>
+                    <span className="text-[10px] text-indigo-400 shrink-0 ml-2">
+                      {(s.score * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-white/35 mt-1 line-clamp-2">{s.text}</p>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 export function ChatBox({
   activeProjectId,
@@ -73,7 +124,9 @@ export function ChatBox({
         if (res.data && res.data.history && res.data.history.length > 0) {
            const dbMessages = res.data.history.map((h: any) => ({
               role: h.role === "assistant" ? "system" : h.role,
-              text: h.content
+              text: h.content,
+              // Bug 3 fix: restore persisted sources so citations survive page refresh
+              ...(h.sources && h.sources.length > 0 ? { sources: h.sources } : {}),
            }));
            
            setMessages([
@@ -135,6 +188,7 @@ export function ChatBox({
           errorMsg = `Server error (${response.status}): ${response.statusText}`;
         }
         setIsTyping(false);
+        triggerToast(errorMsg);
         setMessages(prev => [...prev, { role: "error", text: `**Error:** ${errorMsg}` }]);
         scrollToBottom();
         return;
@@ -184,6 +238,16 @@ export function ChatBox({
                   return newArr;
                 });
                 scrollToBottom();
+              } else if (data.type === "sources") {
+                // Attach sources to the last assistant message
+                setMessages(prev => {
+                  const updated = [...prev];
+                  const lastIdx = updated.length - 1;
+                  if (updated[lastIdx]?.role === "system") {
+                    updated[lastIdx] = { ...updated[lastIdx], sources: data.sources };
+                  }
+                  return updated;
+                });
               } else if (data.type === "error") {
                 // Render custom Error Exception signal safely in a dedicated error bubble
                 setIsTyping(false);
@@ -341,6 +405,10 @@ export function ChatBox({
                         {msg.text}
                      </ReactMarkdown>
                   </div>
+                  {/* Source Citations — rendered below the markdown, inside the assistant bubble */}
+                  {msg.role === "system" && msg.sources && msg.sources.length > 0 && (
+                    <SourceCitations sources={msg.sources} />
+                  )}
                 </div>
               </div>
             </motion.div>

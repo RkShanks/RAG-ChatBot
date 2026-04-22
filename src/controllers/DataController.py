@@ -24,7 +24,17 @@ class DataController(BaseController):
         logger.debug(f"Validating: {file.filename} | MIME: {file.content_type}")
 
         # 1. Define the strictly allowed extensions
-        allowed_extensions = {".pdf", ".txt", ".md", ".markdown"}
+        allowed_extensions = {
+            ".pdf",       # Docling: InputFormat.PDF
+            ".docx",      # Docling: InputFormat.DOCX
+            ".pptx",      # Docling: InputFormat.PPTX
+            ".xlsx",      # Docling: InputFormat.XLSX
+            ".html",      # Docling: InputFormat.HTML
+            ".htm",       # Docling: InputFormat.HTML (alias)
+            ".md",        # Docling: InputFormat.MD
+            ".markdown",  # Docling: InputFormat.MD (alias)
+            ".txt",       # Plain text fallback
+        }
 
         # 2. Extract the actual extension from the filename
         file_ext = os.path.splitext(file.filename)[1].lower()

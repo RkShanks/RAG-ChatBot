@@ -26,12 +26,16 @@ class ChunkModel:
             # Format headings into a clean string for the LLM (e.g., "Chapter 1 > Introduction")
             heading_str = " > ".join(raw_headings) if isinstance(raw_headings, list) else str(raw_headings)
 
+            # Page lives at: dl_meta → doc_items[0] → prov[0] → page_no (1-indexed)
+            try:
+                page_number = dl_meta["doc_items"][0]["prov"][0]["page_no"]
+            except (KeyError, IndexError, TypeError):
+                page_number = 0  # absent for non-paginated formats (MD, TXT, HTML)
+
             #  Build a strictly controlled, 100% safe metadata dictionary
             safe_metadata = {
                 "source": chunk.metadata.get("source", "unknown"),
-                # LangChain sometimes uses "page", Docling sometimes uses "page_no".
-                # This safely checks both and defaults to 0.
-                "page_number": chunk.metadata.get("page_no", chunk.metadata.get("page", 0)),
+                "page_number": page_number,
                 "heading": heading_str,
                 "title": chunk.metadata.get("title", ""),
             }

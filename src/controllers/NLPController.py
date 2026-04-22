@@ -223,4 +223,4 @@ CONSTRAINTS:
         stream = self.generation_client.generate_text_stream(
             prompt=query, chat_history=final_payload_history, max_output_tokens=max_output_tokens, **gen_kwargs
         )
-        return stream, final_payload_history
+        return stream, final_payload_history, search_results

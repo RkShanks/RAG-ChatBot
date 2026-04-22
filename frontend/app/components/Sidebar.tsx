@@ -18,6 +18,24 @@ import type { UserProfile } from "./SettingsPanel";
 
 type ProjectInfo = { id: string; name: string };
 
+/** Returns a short uppercase badge label for a file extension */
+function getFileBadge(fileName: string): { label: string; color: string } {
+  const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
+  const map: Record<string, { label: string; color: string }> = {
+    pdf:      { label: 'PDF',  color: 'text-red-400 bg-red-400/10 border-red-400/20' },
+    docx:     { label: 'DOC', color: 'text-blue-400 bg-blue-400/10 border-blue-400/20' },
+    doc:      { label: 'DOC', color: 'text-blue-400 bg-blue-400/10 border-blue-400/20' },
+    pptx:     { label: 'PPT', color: 'text-orange-400 bg-orange-400/10 border-orange-400/20' },
+    xlsx:     { label: 'XLS', color: 'text-green-400 bg-green-400/10 border-green-400/20' },
+    html:     { label: 'HTML', color: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20' },
+    htm:      { label: 'HTML', color: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20' },
+    md:       { label: 'MD',  color: 'text-purple-400 bg-purple-400/10 border-purple-400/20' },
+    markdown: { label: 'MD',  color: 'text-purple-400 bg-purple-400/10 border-purple-400/20' },
+    txt:      { label: 'TXT', color: 'text-white/50 bg-white/5 border-white/10' },
+  };
+  return map[ext] ?? { label: ext.toUpperCase() || 'FILE', color: 'text-white/40 bg-white/5 border-white/10' };
+}
+
 export function Sidebar({
   projects,
   activeProjectId,
@@ -29,6 +47,7 @@ export function Sidebar({
   onSwitchProject,
   onDeleteProject,
   onToggleSettings,
+  onPreviewFile,
   userProfile,
 }: {
   projects: ProjectInfo[];
@@ -37,6 +56,7 @@ export function Sidebar({
   isUploading: boolean;
   onFileUpload: (f: File) => void;
   onDeleteFile: (id: string) => void;
+  onPreviewFile: (file: { id: string; name: string }) => void;
   onNewProject: () => void;
   onSwitchProject: (id: string) => void;
   onDeleteProject: (id: string) => void;
@@ -153,21 +173,29 @@ export function Sidebar({
                 animate={{ opacity: 1, height: "auto" }}
                 exit={{ opacity: 0, height: 0 }}
                 key={file.id}
-                className="group flex items-center justify-between p-2 rounded-lg hover:bg-white/5 transition-all cursor-pointer"
+                className="group flex items-center justify-between p-2 rounded-lg hover:bg-white/5 transition-all"
               >
-                <div className="flex items-center gap-2 truncate">
-                  <FileText
-                    size={14}
-                    className="text-emerald-400 shrink-0"
-                  />
+                <button
+                  onClick={() => onPreviewFile(file)}
+                  className="flex items-center gap-2 truncate flex-1 text-left"
+                  title={`Preview ${file.name}`}
+                >
+                  {(() => {
+                    const badge = getFileBadge(file.name);
+                    return (
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${badge.color}`}>
+                        {badge.label}
+                      </span>
+                    );
+                  })()}
                   <span className="text-xs text-white/70 group-hover:text-white transition-colors truncate">
                     {file.name}
                   </span>
-                </div>
+                </button>
                 <motion.button
                   onClick={() => onDeleteFile(file.id)}
                   whileHover={{ scale: 1.1 }}
-                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 rounded-md transition-all"
+                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 rounded-md transition-all shrink-0"
                 >
                   <Trash2 size={12} className="text-red-400" />
                 </motion.button>
@@ -186,7 +214,7 @@ export function Sidebar({
               }
             }}
             className="hidden"
-            accept=".txt,.pdf,.md"
+            accept=".pdf,.docx,.pptx,.xlsx,.html,.htm,.md,.markdown,.txt"
           />
 
           {/* Upload Button */}

@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 
 from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -85,7 +86,7 @@ async def chat_with_project(
     rt = request.app.state.runtime_settings
     async def raw_generator():
         try:
-            stream, history = await nlp_controller.ask_question_stream(
+            stream, history, search_results = await nlp_controller.ask_question_stream(
                 project_id=project_id,
                 query=search_request.query,
                 chat_history=project.chat_history,
@@ -102,9 +103,36 @@ async def chat_with_project(
                 safe_data = json.dumps(chunk, ensure_ascii=False)
                 yield f"data: {safe_data}\n\n"
 
+            # Build source_data once — reused for SSE event AND chat history persistence
+            source_data = []
+            if search_results:
+                for r in search_results:
+                    raw_source = r.metadata.get("source", "")
+                    # source is a full disk path — extract just the clean filename
+                    basename = os.path.basename(raw_source) if raw_source else "Unknown"
+                    # Strip the random prefix (everything before the first underscore)
+                    display_name = basename.split("_", 1)[1] if "_" in basename else basename
+
+                    # page_number is 1-indexed (Docling native); 0 means prov was absent
+                    raw_page = r.metadata.get("page_number", 0)
+                    page = raw_page if raw_page > 0 else "N/A"
+
+                    source_data.append({
+                        "document": display_name,
+                        "page": page,
+                        "score": round(r.relevance_score, 3),
+                        "text": r.text[:250],
+                    })
+
+                yield f"data: {json.dumps({'type': 'sources', 'sources': source_data}, ensure_ascii=False)}\n\n"
+
             if final_text.strip():
                 project.chat_history.append({"role": "user", "content": search_request.query})
-                project.chat_history.append({"role": "assistant", "content": final_text})
+                # Bug 3 fix: persist sources so they survive page refresh
+                assistant_entry: dict = {"role": "assistant", "content": final_text}
+                if source_data:
+                    assistant_entry["sources"] = source_data
+                project.chat_history.append(assistant_entry)
                 await project_model.update_project(project)
 
         except CustomAPIException as e:
