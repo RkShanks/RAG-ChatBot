@@ -27,8 +27,10 @@ def get_log_config():
                 "format": "%(asctime)s | [%(correlation_id)s] | %(levelname)-8s | %(name)s | %(message)s",
                 "datefmt": "%Y-%m-%d %H:%M:%S",
             },
+        } if ENV != "production" else {
             "production_formatter": {
-                "()": "pythonjsonlogger.JsonFormatter",
+                # pythonjsonlogger v4 path: pythonjsonlogger.json.JsonFormatter
+                "()": "pythonjsonlogger.json.JsonFormatter",
                 "fmt": "%(asctime)s %(correlation_id)s %(levelname)s %(name)s %(message)s %(filename)s %(lineno)d",
             },
         },
