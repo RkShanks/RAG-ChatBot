@@ -1,0 +1,15 @@
+FROM python:3.13-slim AS base
+WORKDIR /app
+
+RUN pip install uv
+
+# pyproject.toml and uv.lock are in src/, not the project root
+COPY src/pyproject.toml src/uv.lock ./
+RUN uv sync --frozen --no-dev
+
+COPY src/ ./src/
+
+WORKDIR /app/src
+EXPOSE 8000
+
+CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
