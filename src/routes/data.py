@@ -161,7 +161,7 @@ async def get_project_files(
     return JSONResponse(
         content={
             "signal": "success",
-            "files": [{"id": str(a.id), "name": a.asset_name} for a in assets]
+            "files": [{"id": str(a.id), "name": a.asset_name.split("_", 1)[1] if "_" in a.asset_name else a.asset_name} for a in assets]
         }
     )
 
