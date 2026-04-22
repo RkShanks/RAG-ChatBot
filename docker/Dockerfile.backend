@@ -3,13 +3,15 @@ WORKDIR /app
 
 RUN pip install uv
 
-# pyproject.toml and uv.lock are in src/, not the project root
+# Copy dependency files first — separate layer for Docker cache efficiency
+# (only rebuilds package install when pyproject.toml or uv.lock changes)
 COPY src/pyproject.toml src/uv.lock ./
 RUN uv sync --frozen --no-dev
 
-COPY src/ ./src/
+# Copy the full source into /app (overwrites pyproject.toml — same file, no conflict)
+# uvicorn finds main.py at /app/main.py, venv stays at /app/.venv
+COPY src/ ./
 
-WORKDIR /app/src
 EXPOSE 8000
 
 CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
