@@ -13,8 +13,12 @@ export const getSessionId = () => {
   return sessionId;
 };
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL
+  ? `${process.env.NEXT_PUBLIC_API_URL}/api/v1`
+  : '/api/v1';
+
 export const apiClient = axios.create({
-  baseURL: 'http://localhost:8000/api/v1',
+  baseURL: API_BASE,
   headers: {
     'Content-Type': 'application/json',
   },

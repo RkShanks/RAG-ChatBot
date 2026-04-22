@@ -1,0 +1,40 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: RAG Chatbot Alerts
+    folder: RAG Alerts
+    interval: 1m
+    rules:
+      - uid: error-spike
+        title: Backend Error Spike
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: loki
+            model:
+              expr: 'sum(rate({service="backend"} |= "ERROR" [5m]))'
+        noDataState: OK
+        execErrState: Alerting
+        for: 2m
+        annotations:
+          summary: "High error rate detected in backend"
+          description: "More than 5 errors/min in the last 5 minutes"
+        labels:
+          severity: critical
+
+      - uid: service-down
+        title: Backend Service Down
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: loki
+            model:
+              expr: 'absent(rate({service="backend"}[2m]))'
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 1m
+        annotations:
+          summary: "Backend service appears to be down"
+          description: "No logs received from backend in the last 2 minutes"
+        labels:
+          severity: critical
