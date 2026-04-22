@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 
 from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -102,22 +103,36 @@ async def chat_with_project(
                 safe_data = json.dumps(chunk, ensure_ascii=False)
                 yield f"data: {safe_data}\n\n"
 
-            # Emit source citations after the answer stream completes
+            # Build source_data once — reused for SSE event AND chat history persistence
+            source_data = []
             if search_results:
-                source_data = [
-                    {
-                        "document": r.metadata.get("source", "Unknown"),
-                        "page": r.metadata.get("page_number", "N/A"),
+                for r in search_results:
+                    raw_source = r.metadata.get("source", "")
+                    # source is a full disk path — extract just the clean filename
+                    basename = os.path.basename(raw_source) if raw_source else "Unknown"
+                    # Strip the random prefix (everything before the first underscore)
+                    display_name = basename.split("_", 1)[1] if "_" in basename else basename
+
+                    # page_number is 0-indexed in chunks — convert to 1-indexed for display
+                    raw_page = r.metadata.get("page_number")
+                    page = (raw_page + 1) if isinstance(raw_page, int) and raw_page >= 0 else "N/A"
+
+                    source_data.append({
+                        "document": display_name,
+                        "page": page,
                         "score": round(r.relevance_score, 3),
                         "text": r.text[:250],
-                    }
-                    for r in search_results
-                ]
+                    })
+
                 yield f"data: {json.dumps({'type': 'sources', 'sources': source_data}, ensure_ascii=False)}\n\n"
 
             if final_text.strip():
                 project.chat_history.append({"role": "user", "content": search_request.query})
-                project.chat_history.append({"role": "assistant", "content": final_text})
+                # Bug 3 fix: persist sources so they survive page refresh
+                assistant_entry: dict = {"role": "assistant", "content": final_text}
+                if source_data:
+                    assistant_entry["sources"] = source_data
+                project.chat_history.append(assistant_entry)
                 await project_model.update_project(project)
 
         except CustomAPIException as e:

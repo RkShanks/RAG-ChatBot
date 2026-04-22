@@ -25,6 +25,7 @@ class ResponseSignal(Enum):
     FILE_UPLOADED_FAILED = ("file_uploaded_failed", "There was an error uploading your file. Please try again.")
     FILE_NOT_FOUND = ("file_not_found", "The requested file could not be found.")
     FILE_DELETED_SUCCESSFULLY = ("file_deleted_successfully", "The specific file and its vector data were permanently removed.")
+    FILE_ALREADY_EXISTS = ("file_already_exists", "A file with this name already exists in the workspace. Please delete the old file first or rename before uploading.")
 
     # --- Wikipedia Operations ---
     WIKI_SEARCH_RESULTS_FOUND = ("wiki_search_results_found", "Wikipedia search results retrieved successfully.")

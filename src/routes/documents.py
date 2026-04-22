@@ -8,7 +8,7 @@ from controllers.ProjectController import ProjectController
 from helpers.dependencies import get_session_id
 from helpers.exceptions import CustomAPIException
 from helpers.ResponseEnums import ResponseSignal
-from models import AssetModel
+from models import AssetModel, ProjectModel
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +33,21 @@ async def preview_document(
     - Text formats (.txt, .md, .html): read directly as UTF-8.
     - Binary formats (.pdf, .docx, .pptx, .xlsx): converted to Markdown via Docling.
     """
+    # 1. Verify project ownership via session (same pattern as data.py)
+    project_model = ProjectModel(db_client=request.app.state.db_client)
+    project = await project_model.get_project(project_id=project_id, session_id=session_id)
+    if not project:
+        raise CustomAPIException(
+            signal_enum=ResponseSignal.PROJECT_NOT_FOUND,
+            status_code=404,
+            dev_detail=f"Project '{project_id}' not found or session mismatch.",
+        )
+
+    # 2. Fetch the asset and verify it belongs to this project
     asset_model = AssetModel(db_client=request.app.state.db_client)
     asset = await asset_model.get_asset_by_id(asset_id=asset_id)
 
-    if not asset or str(asset.asset_project_id) != project_id:
+    if not asset or str(asset.asset_project_id) != str(project.id):
         raise CustomAPIException(
             signal_enum=ResponseSignal.FILE_NOT_FOUND,
             status_code=404,

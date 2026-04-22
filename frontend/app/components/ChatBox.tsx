@@ -124,7 +124,9 @@ export function ChatBox({
         if (res.data && res.data.history && res.data.history.length > 0) {
            const dbMessages = res.data.history.map((h: any) => ({
               role: h.role === "assistant" ? "system" : h.role,
-              text: h.content
+              text: h.content,
+              // Bug 3 fix: restore persisted sources so citations survive page refresh
+              ...(h.sources && h.sources.length > 0 ? { sources: h.sources } : {}),
            }));
            
            setMessages([

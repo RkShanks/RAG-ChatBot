@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from controllers import BaseController, DataController, ProcessController, ProjectController
 from helpers.config import Settings, get_settings
 from helpers.dependencies import get_session_id
+from helpers.exceptions import CustomAPIException
 from models import AssetModel, ChunkModel, ProjectModel, ResponseSignal, AssetTypeEnum
 from routes.schemes.data import ProcessRequest
 
@@ -40,6 +41,23 @@ async def upload_data(
     # 2. Validate File
     data_controller = DataController()
     data_controller.validate_uploaded_file(file=file)
+
+    # 2.5. Duplicate Detection — check if same clean filename already exists in this workspace
+    asset_model_check = AssetModel(db_client=request.app.state.db_client)
+    existing_assets = await asset_model_check.get_all_project_assets(
+        asset_project_id=str(project.id),
+        asset_type=AssetTypeEnum.FILE.value,
+    )
+    clean_new_name = data_controller.get_clean_file_name(file.filename)
+    for existing in existing_assets:
+        # Strip the random prefix from stored name to get the original clean filename
+        stored_base = existing.asset_name.split("_", 1)[1] if "_" in existing.asset_name else existing.asset_name
+        if stored_base == clean_new_name:
+            raise CustomAPIException(
+                signal_enum=ResponseSignal.FILE_ALREADY_EXISTS,
+                status_code=409,
+                dev_detail=f"Duplicate: '{file.filename}' already exists as '{existing.asset_name}' in project '{project_id}'.",
+            )
 
     # 3. Generate Path
     file_dir_path, file_id = data_controller.generate_unique_file_path(
