@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { ChatBox } from "./components/ChatBox";
 import { SettingsPanel } from "./components/SettingsPanel";
+import { DocumentPreview } from "./components/DocumentPreview";
 import type { UserProfile } from "./components/SettingsPanel";
 import { apiClient } from "./lib/api";
 import { useErrorToast } from "./lib/ToastContext";
@@ -21,6 +22,7 @@ export default function Home() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [chatResetKey, setChatResetKey] = useState(0);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [previewFile, setPreviewFile] = useState<{ id: string; name: string } | null>(null);
   const { triggerToast } = useErrorToast();
 
   // ─── Fetch user profile on mount ───
@@ -246,6 +248,7 @@ export default function Home() {
         isUploading={isUploading}
         onFileUpload={handleFileUpload}
         onDeleteFile={handleDeleteFile}
+        onPreviewFile={(file) => setPreviewFile(file)}
         onNewProject={createNewWorkspace}
         onSwitchProject={handleSwitchProject}
         onDeleteProject={handleDeleteProject}
@@ -273,6 +276,16 @@ export default function Home() {
           setChatResetKey(prev => prev + 1);
         }}
       />
+
+      {/* Document Preview Modal */}
+      {previewFile && activeProjectId && (
+        <DocumentPreview
+          projectId={activeProjectId}
+          assetId={previewFile.id}
+          fileName={previewFile.name}
+          onClose={() => setPreviewFile(null)}
+        />
+      )}
     </main>
   );
 }
