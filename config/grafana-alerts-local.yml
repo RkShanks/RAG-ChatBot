@@ -1,0 +1,5 @@
+apiVersion: 1
+# Local testing override — alert rules are disabled
+# (Loki alerting requires live log data; not useful in local dev)
+# Production alert rules are in config/grafana-alerts.yml
+groups: []

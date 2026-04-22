@@ -1,0 +1,6 @@
+apiVersion: 1
+# Local testing override — contact points are disabled
+# (Telegram/Gmail tokens not available in local dev environments)
+# Production contact points are in config/grafana-contact-points.yml
+contactPoints: []
+policies: []

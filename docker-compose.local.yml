@@ -28,3 +28,10 @@ services:
   # Override certbot: no-op (no real domain locally)
   certbot:
     entrypoint: echo "Certbot skipped in local mode"
+
+  # Override grafana: replace production alerting configs with empty local versions
+  # Prevents startup crash on: (1) CHANGE_ME Telegram token, (2) Loki alert query validation
+  grafana:
+    volumes:
+      - ./config/grafana-alerts-local.yml:/etc/grafana/provisioning/alerting/alerts.yml
+      - ./config/grafana-contact-points-local.yml:/etc/grafana/provisioning/alerting/contact-points.yml
