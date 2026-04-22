@@ -183,15 +183,15 @@ class MongoDBClient(VectorDBInterface):
                 dev_detail=f"Failed to create collection or vector index for '{collection_name}'.",
             ) from e
 
-    async def insert_one(self, collection_name: str, document: DocumentChunk) -> bool:
+    async def insert_one(self, collection_name: str, document: DocumentChunk) -> int:
         return await self.insert_many(collection_name, [document])
 
-    async def insert_many(self, collection_name: str, documents: List[DocumentChunk], batch_size: int = 100) -> bool:
+    async def insert_many(self, collection_name: str, documents: List[DocumentChunk], batch_size: int = 100) -> int:
         logger.debug(f"Inserting {len(documents)} documents into collection: {collection_name}")
 
         if not await self.is_collection_exist(collection_name):
             logger.warning(f"Collection {collection_name} does not exist.")
-            return False
+            return len(documents)
 
         collection = self.db[collection_name]
         mongo_docs = self.documents_to_mongo_docs(documents)
@@ -212,7 +212,7 @@ class MongoDBClient(VectorDBInterface):
         logger.info(
             f"Inserted {len(documents) - failed_inserts} chunks into {collection_name}. Failed: {failed_inserts}"
         )
-        return True
+        return failed_inserts
 
     def documents_to_mongo_docs(self, documents: List[DocumentChunk]) -> List[Dict[str, Any]]:
         """Sync helper to convert strictly validated Pydantic models into MongoDB dictionaries."""
