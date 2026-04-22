@@ -13,6 +13,7 @@ from helpers.exceptions import CustomAPIException
 from helpers.logger import setup_logging
 from models import AssetModel, ProjectModel, ResponseSignal
 from routes import base, data, nlp, settings, wiki_search
+from routes.documents import documents_router
 from services.llm import LLMFactory
 from services.ranker import RankerFactory
 from services.vectordb import VectorDBFactory
@@ -226,3 +227,4 @@ app.include_router(data.data_router)
 app.include_router(wiki_search.wiki_search_router)
 app.include_router(nlp.nlp_router)
 app.include_router(settings.settings_router)
+app.include_router(documents_router)

@@ -85,7 +85,7 @@ async def chat_with_project(
     rt = request.app.state.runtime_settings
     async def raw_generator():
         try:
-            stream, history = await nlp_controller.ask_question_stream(
+            stream, history, search_results = await nlp_controller.ask_question_stream(
                 project_id=project_id,
                 query=search_request.query,
                 chat_history=project.chat_history,
@@ -101,6 +101,19 @@ async def chat_with_project(
                 # 'chunk' is the dictionary we created in the client e.g., {"type": "answer", "text": "مرحبا"}
                 safe_data = json.dumps(chunk, ensure_ascii=False)
                 yield f"data: {safe_data}\n\n"
+
+            # Emit source citations after the answer stream completes
+            if search_results:
+                source_data = [
+                    {
+                        "document": r.metadata.get("source", "Unknown"),
+                        "page": r.metadata.get("page_number", "N/A"),
+                        "score": round(r.relevance_score, 3),
+                        "text": r.text[:250],
+                    }
+                    for r in search_results
+                ]
+                yield f"data: {json.dumps({'type': 'sources', 'sources': source_data}, ensure_ascii=False)}\n\n"
 
             if final_text.strip():
                 project.chat_history.append({"role": "user", "content": search_request.query})
