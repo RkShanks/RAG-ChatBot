@@ -30,6 +30,11 @@ async def welcome(request: Request, app_settings: Settings = Depends(get_setting
     }
 
 
+@base_router.get("/health")
+async def health_check():
+    return {"status": "healthy", "version": "1.0.0"}
+
+
 async def check_db_connection(db_client):
     try:
         await db_client.command("ping")
