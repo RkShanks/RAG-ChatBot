@@ -89,3 +89,4 @@ target/
 # Virtual environment
 .venv/
 src/test.py
+.env.docker
