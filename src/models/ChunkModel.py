@@ -26,24 +26,16 @@ class ChunkModel:
             # Format headings into a clean string for the LLM (e.g., "Chapter 1 > Introduction")
             heading_str = " > ".join(raw_headings) if isinstance(raw_headings, list) else str(raw_headings)
 
-            # ── Page number extraction ──────────────────────────────────────────
-            # langchain_docling (DOC_CHUNKS mode) puts ALL Docling data inside
-            # chunk.metadata["dl_meta"]. The top-level metadata only has "source"
-            # and "dl_meta" — there is NO top-level "page_no" or "page" key.
-            # The real page number lives at: dl_meta → doc_items[0] → prov[0] → page_no
-            # Docling uses 1-indexed pages (page 1 = first page).
-            page_number = 0
-            if dl_meta:
-                doc_items = dl_meta.get("doc_items", [])
-                if doc_items:
-                    prov_list = doc_items[0].get("prov", [])
-                    if prov_list:
-                        page_number = prov_list[0].get("page_no", 0)
+            # Page lives at: dl_meta → doc_items[0] → prov[0] → page_no (1-indexed)
+            try:
+                page_number = dl_meta["doc_items"][0]["prov"][0]["page_no"]
+            except (KeyError, IndexError, TypeError):
+                page_number = 0  # absent for non-paginated formats (MD, TXT, HTML)
 
             #  Build a strictly controlled, 100% safe metadata dictionary
             safe_metadata = {
                 "source": chunk.metadata.get("source", "unknown"),
-                "page_number": page_number,   # 1-indexed; 0 means prov was absent
+                "page_number": page_number,
                 "heading": heading_str,
                 "title": chunk.metadata.get("title", ""),
             }
